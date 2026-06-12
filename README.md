@@ -36,7 +36,7 @@ An offline-first, private-by-design mobile application built with Flutter that r
 ## GitHub Repository
 
 Access the source code, open issues, and submit pull requests here:
-👉 **[Ranga GitHub Repository](https://github.com/jimbo111/gemma-on-device)**
+👉 **[Ranga GitHub Repository](https://github.com/tuyishimejeandamour/capstone)**
 
 ---
 
@@ -91,7 +91,7 @@ Ranga utilizes a modern, glassmorphic dark-pastel aesthetic designed to provide 
 ### Step 1: Onboarding & App Setup (Home Screen)
 The home screen serves as the initial portal for first-launch onboarding, introducing the student to Ranga as a 100% offline, private health guide. 
 
-![Home Screen](docs/homeScreen.png)
+![Home Screen](app/docs/homeScreen.png)
 
 - **Offline Check**: Upon startup, Ranga performs a local storage check. If the model files are missing, it initiates the secure, resumable download of the 2.4 GB `gemma-4-E2B-it.litertlm` file from HuggingFace.
 - **Registration Stage**: Users interact with a sliding gesture knob to transition to the registration phase, where they input their name, select a Rwandan insurance plan (Mutuelle, RSSB, MMI, or private providers), and upload their medical insurance card/contract as a PDF or image.
@@ -101,7 +101,7 @@ The home screen serves as the initial portal for first-launch onboarding, introd
 ### Step 2: Local AI Personalization & Context (Student Profile Sidebar)
 Once setup is complete, the student profile drawer provides a persistent interface showing all user context information stored locally in the SQLite database.
 
-![Student Profile Sidebar](docs/student%20profile.png)
+![Student Profile Sidebar](app/docs/student%20profile.png)
 
 - **AI-Powered Analysis**: During the final setup warm-up, the local Gemma 4 model reads the uploaded contract file. Using native PDF parsing or image vision projection, the model analyzes the policy and extracts co-payment rates, policy IDs, and benefit limitations.
 - **Context Steering**: The resulting benefit summary is displayed inside the scrollable drawer. Ranga automatically appends this summary context to the background system prompt for all subsequent chats, ensuring the local AI is fully aware of their specific policy limitations when answering questions.
@@ -111,7 +111,7 @@ Once setup is complete, the student profile drawer provides a persistent interfa
 ### Step 3: Private AI Consultations (Consulting Screen)
 The consulting screen enables real-time conversations between the student and Ranga, operating completely offline.
 
-![Consulting Screen](docs/consultingascreen.png)
+![Consulting Screen](app/docs/consultingascreen.png)
 
 - **Performance Bar**: The green bar at the top displays runtime metrics—identifying whether the local model is accelerated by Vulkan/Metal GPU delegates, the token generation rate (e.g. ~52 tok/s), and thermal cooldown alerts.
 - **Voice Capabilities**: The interface integrates speech-to-text (STT) and text-to-speech (TTS) engines, allowing students to speak their queries and hear Ranga's guidance read back to them.
@@ -130,7 +130,7 @@ The consulting screen enables real-time conversations between the student and Ra
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/jimbo111/gemma-on-device.git ranga
+   git clone https://github.com/tuyishimejeandamour/capstone.git ranga
    cd ranga
    ```
 
