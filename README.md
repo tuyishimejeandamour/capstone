@@ -14,7 +14,8 @@ An offline-first, private-by-design mobile application built with Flutter that r
 7. [Deployment & Release Plan](#deployment--release-plan)
 8. [Performance Benchmarks & Safeguards](#performance-benchmarks--safeguards)
 9. [Tech Stack](#tech-stack)
-10. [License](#license)
+10. [Video Demonstration](#video-demonstration)
+11. [License](#license)
 
 ---
 
@@ -88,34 +89,54 @@ graph TD
 
 Ranga utilizes a modern, glassmorphic dark-pastel aesthetic designed to provide an interactive, reassuring user experience. Below is a detailed walkthrough of how the application operates, referenced against the actual app screenshots.
 
-### Step 1: Onboarding & App Setup (Home Screen)
-The home screen serves as the initial portal for first-launch onboarding, introducing the student to Ranga as a 100% offline, private health guide. 
+### Step 1: Welcome & Identity Branding (Welcome Screen)
+The welcome screen introduces the student to Ranga and establishes the core theme: 100% offline, private-by-design AI health support.
+
+![Welcome Screen](app/docs/welcome.png)
+
+- **First-Launch Hook**: Features a clean holographic brand identity with a quick overview of key functionalities (Offline AI assistant, contract parsing, voice capabilities).
+- **Setup Trigger**: Tapping "Get Started" triggers the system verification check, looking for pre-cached SQLite files and local model weights.
+
+---
+
+### Step 2: Local LLM Installation (Downloading Model Screen)
+If the device doesn't have the local model files pre-installed, Ranga manages the model provisioning process through a structured download interface.
+
+![Model Downloading Screen](app/docs/downlaoding.png)
+
+- **Progress & Metrics**: Displays download progress, download speed, and remaining file size for the 2.4 GB `gemma-4-E2B-it.litertlm` file fetched from HuggingFace.
+- **Resumable Connection**: Designed with range-request fallback mechanisms, ensuring the download resumes smoothly even under unstable network conditions in Rwanda.
+
+---
+
+### Step 3: Onboarding & App Setup (Home Screen)
+The home screen serves as the initial portal for profile creation and document uploading once the model setup is complete.
 
 ![Home Screen](app/docs/homeScreen.png)
 
-- **Offline Check**: Upon startup, Ranga performs a local storage check. If the model files are missing, it initiates the secure, resumable download of the 2.4 GB `gemma-4-E2B-it.litertlm` file from HuggingFace.
-- **Registration Stage**: Users interact with a sliding gesture knob to transition to the registration phase, where they input their name, select a Rwandan insurance plan (Mutuelle, RSSB, MMI, or private providers), and upload their medical insurance card/contract as a PDF or image.
+- **Registration Stage**: Students register by inputting their name and selecting their health insurance provider (CBHI Mutuelle de Santé, RSSB/RAMA, MMI, or private providers).
+- **Contract Upload**: Users upload their medical insurance card/contract as a PDF or image, which acts as the source document for the local extraction process.
 
 ---
 
-### Step 2: Local AI Personalization & Context (Student Profile Sidebar)
-Once setup is complete, the student profile drawer provides a persistent interface showing all user context information stored locally in the SQLite database.
+### Step 4: Local AI Personalization & Context (Student Profile Sidebar)
+The student profile drawer provides a persistent view of the student's context, parsed locally from their uploaded documents.
 
 ![Student Profile Sidebar](app/docs/student%20profile.png)
 
-- **AI-Powered Analysis**: During the final setup warm-up, the local Gemma 4 model reads the uploaded contract file. Using native PDF parsing or image vision projection, the model analyzes the policy and extracts co-payment rates, policy IDs, and benefit limitations.
-- **Context Steering**: The resulting benefit summary is displayed inside the scrollable drawer. Ranga automatically appends this summary context to the background system prompt for all subsequent chats, ensuring the local AI is fully aware of their specific policy limitations when answering questions.
+- **AI-Powered Analysis**: During initialization, the local Gemma 4 model parses the uploaded contract text or image bytes, extracting co-payment rates, policy numbers, benefit ceilings, and excluded networks.
+- **Context Steering**: The resulting benefit summary is saved to the local SQLite database and automatically appended to the system prompt context for subsequent chat sessions.
 
 ---
 
-### Step 3: Private AI Consultations (Consulting Screen)
-The consulting screen enables real-time conversations between the student and Ranga, operating completely offline.
+### Step 5: Private AI Consultations (Consulting Screen)
+The consulting screen is where real-time, offline health guidance takes place.
 
 ![Consulting Screen](app/docs/consultingascreen.png)
 
-- **Performance Bar**: The green bar at the top displays runtime metrics—identifying whether the local model is accelerated by Vulkan/Metal GPU delegates, the token generation rate (e.g. ~52 tok/s), and thermal cooldown alerts.
-- **Voice Capabilities**: The interface integrates speech-to-text (STT) and text-to-speech (TTS) engines, allowing students to speak their queries and hear Ranga's guidance read back to them.
-- **Rwandan Hospital Matching**: When users query symptoms or hospital availability, Ranga matches the symptoms against local UR clinic resources or suggests the nearest in-network Kigali hospital (e.g., suggesting Kibagabaga Hospital for Mutuelle users, or Legacy Clinics / King Faisal Hospital for RSSB / RAMA).
+- **Performance Bar**: The green bar at the top displays real-time telemetry, identifying GPU delegate acceleration (Vulkan/Metal), token generation rate (e.g. ~52 tok/s), and thermal states.
+- **Voice Capabilities**: Full integration of local Speech-to-Text (STT) and Text-to-Speech (TTS) engines allows students to speak their queries and hear Ranga's replies.
+- **Local Hospital Matching**: Automatically checks symptom context against local Rwandan health infrastructure (e.g., suggesting Legacy Clinics or King Faisal Hospital for RSSB users, or district referral hospitals for Mutuelle users) and calculates co-pays.
 
 ---
 
@@ -226,6 +247,13 @@ flowchart TD
 - **Animations Package**: `flutter_animate` for smooth onboarding visual micro-interactions
 - **Audio processing**: `speech_to_text` and `flutter_tts` for voice interaction loops
 - **File System Utils**: `file_picker` & `read_pdf_text`
+
+---
+
+## Video Demonstration
+
+Watch the video demonstration of the Ranga Offline Student Health Assistant prototype on YouTube:
+👉 **[Ranga Video Demonstration](https://youtu.be/1KIjuS3H9CQ)**
 
 ---
 
