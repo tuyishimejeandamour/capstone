@@ -42,7 +42,6 @@ This proposal includes the following sections. First is the Abstract. Second is 
 | SFT | Supervised Fine-Tuning |
 | SLM | Small Language Model |
 | SOS | Save Our Souls (Emergency Signal) |
-| TTS | Text-to-Speech |
 | UI | User Interface |
 | UML | Unified Modeling Language |
 | UTAUT | Unified Theory of Acceptance and Use of Technology |
@@ -58,9 +57,9 @@ People use four different insurance plans. These plans are the RSSB scheme (Rwan
 
 This project proposes a new phone app called Ranga. The name comes from a Kinyarwanda word that means to show the right way. The app does not need the internet. Its main goal is to recommend hospitals based on insurance rules and track visit feedback. The app stores clinic details, insurance networks, and estimated costs for seven core medical services. The initial version of the app only uses English to process queries. We pilot the app with ALU Kigali students because they speak English as their primary language, which bypasses language translation issues. The app uses an offline-first design. It updates its database silently in the background when the phone connects to university Wi-Fi. This stops the app from sending users to closed or de-listed clinics.
 
-The app runs on two AI models. The first model is Google's Gemma 4 E2B-it (Google DeepMind, 2026b). It has two billion parameters. It can listen to English voices directly. It does not need a separate speech-to-text model like Whisper-tiny. This makes the app use less phone memory. It also makes the app load faster. The model reads the user's voice and decides which medical specialty is needed. It checks if the user has a history of the same illness. If the user has a chronic illness, the app lets them skip the referral step. In this case, the app sends them to a specialized hospital. The app also estimates how much money they must pay. The second model is Kokoro-82M (Hexgrad, 2025). This model reads the recommendation aloud. The app loads these two models one after the other. It never loads them at the same time. This stops the phone from running out of memory.
+The app runs on Google's Gemma 4 2B-it (Google DeepMind, 2026b) language model. It has two billion parameters. This model processes the user's typed text queries on-device and decides which medical specialty is needed. It checks if the user has a history of the same illness. If the user has a chronic illness, the app lets them skip the referral step. In this case, the app sends them to a specialized hospital. The app also estimates how much money they must pay. The app runs this single model locally on the phone, which reduces device memory usage and ensures high execution speed.
 
-We will evaluate the system using on-device simulations and fifty crafted voice query samples. We will test the model's accuracy in identifying clinic categories and routing queries. We will use a Chi-Square test with an alpha of five hundredths to prove that direct preference optimization reduces routing errors compared to supervised fine-tuning alone.
+We will evaluate the system using on-device simulations and fifty crafted text query samples. We will test the model's accuracy in identifying clinic categories and routing queries. We will use a Chi-Square test with an alpha of five hundredths to prove that direct preference optimization reduces routing errors compared to supervised fine-tuning alone.
 
 ---
 
@@ -80,8 +79,8 @@ We put these rules into a Policy Routing Formula in Section 2.2.12. This formula
 
 ```mermaid
 graph TD
-    A[Student Records English Voice Query] --> B[Ranga App]
-    B --> C[Gemma 4 E2B-it: Native Multimodal Audio Input]
+    A[Student Inputs English Text Query] --> B[Ranga App]
+    B --> C[Gemma 4 2B-it: On-Device Language Model]
     C --> D[Classify Specialty Tier & Required Service Level]
     D --> E[Query SQLite DB: hospital_services & recommendation_session history]
     E --> F{Bypass Referral Chain? <br> High Specialty OR Chronic Pattern Detected?}
@@ -89,8 +88,7 @@ graph TD
     F -->|No: Standard Flow| H[Standard Route: Rank Covered Primary Facilities by Cost/Distance]
     G --> I[Estimate OOP Copayments for 7 Core Services]
     H --> I
-    I --> J[Synthesize Spoken Response using Kokoro-82M TTS]
-    J --> K[Provide Visual UI Display & Spoken Recommendations]
+    I --> K[Provide Visual UI Display & Ranked Recommendations]
 ```
 
 ## 1.2 Problem Statement
@@ -105,31 +103,31 @@ The main goal of this project is to build a private, offline mobile app. The app
 
 ### 1.3.1 Specific Objectives
 
-The project has five specific goals. The first goal is to collect five hundred clinic queries, hospital services, insurance networks, and visit logs by July 2026. An insurance specialist will review this dataset. This dataset will not include any medical diagnoses, drug names, or medical device recommendations.
+The project has five specific goals. The first goal is to collect five hundred clinic queries, hospital services, insurance networks, and visit logs by July 2026. A professional doctor will review this dataset. This dataset will not include any medical diagnoses, drug names, or medical device recommendations.
 
-The second goal is to train the Gemma 4 E2B-it model using supervised fine-tuning and direct preference optimization by August 2026. The training aims to reach an accuracy of eighty-five percent or higher in specialty classification and provider recommendation. We will use a Chi-Square test with an alpha of five hundredths to prove that direct preference optimization reduces out-of-network routing mistakes.
+The second goal is to train the Gemma 4 2B-it model using supervised fine-tuning and direct preference optimization by August 2026. The training aims to reach an accuracy of eighty-five percent or higher in specialty classification and provider recommendation. We will use a Chi-Square test with an alpha of five hundredths to prove that direct preference optimization reduces out-of-network routing mistakes.
 
 The third goal is to build an encrypted SQLite database on the phone by August 2026. This database will store the 15 best Kigali hospitals in a 25-kilometer radius, their copayment rates for 7 core services, and past user visits. It will also use a background update plan that warns users if the data is old.
 
-The fourth goal is to make a Flutter mobile app by September 2026. This app will load its two models one after the other. It will use Gemma 4 for voice input and Kokoro-82M for text-to-speech. The app will also include a query validation screen to fix accent mistakes and a list of hospitals sorted by cost.
+The fourth goal is to make a Flutter mobile app by September 2026. This app will run the Gemma 4 2B-it model locally on the device to process typed queries and display a list of hospitals sorted by cost.
 
-The fifth goal is to evaluate the app using fifty crafted voice query samples by October 2026. We want to reach an average recommendation accuracy of eighty percent or higher. We also want to measure latency, memory usage, and battery consumption on the test phone.
+The fifth goal is to evaluate the app using fifty crafted text query samples by October 2026. We want to reach an average recommendation accuracy of eighty-five percent or higher. We also want to measure latency, memory usage, and battery consumption on the test phone.
 
 ### 1.3.2 Risk and Mitigation Matrix
 
 | Objective | Identified Risk | Impact | Mitigation Strategy |
 |---|---|---|---|
-| First Objective (Dataset) | The specialist rejects more than twenty percent of the clinic queries. This would slow down the project. | High | We will start with three hundred standard query templates. We will only review two hundred custom queries manually. We will also ask an ALU staff member to help review. |
+| First Objective (Dataset) | The professional doctor rejects more than twenty percent of the clinic queries. This would slow down the project. | High | We will start with three hundred standard query templates. We will only review two hundred custom queries manually. We will ask a professional doctor to help review. |
 | Second Objective (DPO Training) | Direct preference optimization uses double the graphics memory. This might crash the Google Colab computer. | High | We will use Unsloth memory tricks. We will reduce the model rank to eight during training. We will also limit the model text memory to one thousand twenty-four tokens. |
-| Fourth Objective (Deployment) | The phone might crash if it runs two AI models at the same time on a device with four gigabytes of memory. | Critical | We will load and unload each model one after the other. The app will never run Gemma 4 and Kokoro-82M at the same time. This keeps the memory usage low. |
-| Fifth Objective (Evaluation) | The fifty crafted voice samples do not cover enough accent variations. | Medium | The researcher will craft and record fifty diverse voice samples representing different pronunciations and accents to evaluate the system. |
-| All | The model might misunderstand user voices because of their regional accents. | High | We will show a validation screen if the model is not sure about a word. The app will ask the user to click the correct hospital name or type it. |
+| Fourth Objective (Deployment) | The phone might run out of memory when loading the Gemma 4 2B-it model on a device with four gigabytes of RAM. | High | We will load the model in 4-bit quantized GGUF format, which requires only about 1.1 GB of RAM, leaving plenty of memory for the operating system and user interface. |
+| Fifth Objective (Evaluation) | The fifty crafted text samples do not cover enough query variations. | Medium | The researcher will craft fifty diverse text queries representing different sentence structures and spelling variants to evaluate the system. |
+| All | The model might fail to recognize misspelled clinic names in text queries. | Medium | The app will use a Jaro-Winkler string similarity distance lookup in the database to auto-suggest corrections for misspelled clinic names. |
 
 ## 1.4 Research Questions
 
 This project aims to answer four research questions.
 
-The first question is about query classification and routing accuracy. How well does the on-device model classify user queries into correct specialty tiers? How well does it recommend the correct hospitals when users speak their queries? We will measure this as a percentage of correct recommendations on a fifty-case test set.
+The first question is about query classification and routing accuracy. How well does the on-device model classify user queries into correct specialty tiers? How well does it recommend the correct hospitals when users type their queries? We will measure this as a percentage of correct recommendations on a fifty-case test set.
 
 The second question is about history-aware interaction personalization. How much does using the user's history of past searches and visit feedback improve the recommendations? We will measure the difference using Jaccard Distance and Cosine Similarity. We will compare our app with a baseline model that does not save user history.
 
@@ -143,15 +141,15 @@ A score close to 1.0 means the recommendations are identical and history did not
 
 The third question is about safety alignment. Does direct preference optimization significantly reduce serious insurance routing errors compared to supervised fine-tuning alone? We define an error as routing a user to an out-of-network clinic. We will test this difference using a Chi-Square test with an alpha of five hundredths. The null hypothesis states that the error rate of the supervised fine-tuning model is equal to the error rate of the direct preference optimization model. Rejecting this hypothesis proves that direct preference optimization makes the app safer.
 
-The fourth question is about device performance and speech accuracy. What are the average response time, highest memory usage, battery drain, and voice recognition accuracy for East African accents when the app runs on a Xiaomi Redmi twelve phone? This phone has four gigabytes of memory and a Snapdragon six hundred eighty-five chip.
+The fourth question is about device performance and query parsing accuracy. What are the average response time, highest memory usage, battery drain, and classification accuracy for diverse phrasing variants when the app runs on a Xiaomi Redmi twelve phone? This phone has four gigabytes of memory and a Snapdragon six hundred eighty-five chip.
 
 ## 1.5 Project Scope
 
 The project scope includes content, geography, and time.
 
-For content scope, the app handles user insurance plan selection and visit feedback logs. The on-device Gemma 4 model classifies clinic queries. The app navigates four insurance schemes, which are RSSB, CBHI, Eden Care, and Britam. It classifies specialty tiers and uses history to decide if a user can bypass a referral. The app estimates copayments for 7 core services, which are General Consultation, Dental Care, Optical Care, Laboratory Tests, Pharmacy & Medication, Emergency Services, and Physical Therapy. It accepts spoken English and uses a validation screen to fix voice accent errors. It also includes an emergency SOS button that dials the mental health helpline at 114 or the ALU duty phone. The app operates offline and syncs in the background. The project does not include medical diagnosis, medical device recommendations, medicine prescriptions, billing, telemedicine, custom policy text parsing, or connections to hospital servers.
+For content scope, the app handles user insurance plan selection and visit feedback logs. The on-device Gemma 4 2B-it model classifies clinic queries. The app navigates four insurance schemes, which are RSSB, CBHI, Eden Care, and Britam. It classifies specialty tiers and uses history to decide if a user can bypass a referral. The app estimates copayments for 7 core services, which are General Consultation, Dental Care, Optical Care, Laboratory Tests, Pharmacy & Medication, Emergency Services, and Physical Therapy. It accepts typed English text queries and uses database-level auto-suggestions to correct minor typos. It also includes an emergency SOS button that dials the mental health helpline at 114 or the ALU duty phone. The app operates offline and syncs in the background. The project does not include medical diagnosis, medical device recommendations, medicine prescriptions, billing, telemedicine, custom policy text parsing, or connections to hospital servers.
 
-For geographical scope, we pilot the app with ALU Kigali students. We choose ALU students because they represent a diverse group that speaks English as their primary language. This ensures that language translation and speech recognition issues do not block our initial evaluation of the core insurance routing logic. The app database includes the 15 best hospitals within a twenty-five kilometer radius of the ALU Kigali campus in Kacyiru. This area covers the main clinics that university students visit.
+For geographical scope, we pilot the app with ALU Kigali students. We choose ALU students because they represent a diverse group that speaks English as their primary language. This ensures that language translation issues do not block our initial evaluation of the core insurance routing logic. The app database includes the 15 best hospitals within a twenty-five kilometer radius of the ALU Kigali campus in Kacyiru. This area covers the main clinics that university students visit.
 
 For time scope, the project runs from May 2026 to October 2026. This period lasts twenty-two weeks. We collect data and train the model from May to July. We develop and evaluate the app from July to October.
 
@@ -189,7 +187,7 @@ gantt
     section Phase 1 Research and Data
     Literature Review                    :a1, 2026-05-01, 14d
     Insurance Dataset Collection         :a2, after a1, 14d
-    Insurance Specialist Validation      :a3, after a2, 7d
+    Professional Doctor Validation       :a3, after a2, 7d
     DPO Labelling with First-Aiders      :a4, after a3, 7d
  
     section Phase 2 ML Pipeline
@@ -200,12 +198,12 @@ gantt
     section Phase 3 App Development
     Flutter App Scaffold                 :c1, after b3, 7d
     Provider DB and Cost Recommender     :c2, after c1, 7d
-    Sequential Model Integration         :c3, after c2, 14d
+    Model Integration                    :c3, after c2, 14d
     UI and SOS and Background Sync       :c4, after c3, 7d
  
     section Phase 4 Evaluation
     On-Device Simulation Evaluation      :d1, 2026-08-01, 14d
-    Performance and Audio Eval           :d2, after d1, 7d
+    Performance and Latency Eval         :d2, after d1, 7d
     Final Documentation                  :d3, after d2, 14d
 ```
 
@@ -215,7 +213,7 @@ gantt
 
 ## 2.1 Introduction
 
-This chapter reviews academic literature across six areas. First, we look at theories about how people adopt new technology and manage their health. Second, we look at mobile health tools and insurance navigation apps. Third, we study speech errors and accent issues in voice health queries. Fourth, we review small language models and model compression. Fifth, we study safety training for insurance routing AI. Finally, we explore health insurance rules and medical costs in Rwanda. The review is organized by these topics. The research gap is described in Section 2.9.
+This chapter reviews academic literature across six areas. First, we look at theories about how people adopt new technology and manage their health. Second, we look at mobile health tools and insurance navigation apps. Third, we study syntactic variations and vocabulary differences in health queries. Fourth, we review small language models and model compression. Fifth, we study safety training for insurance routing AI. Finally, we explore health insurance rules and medical costs in Rwanda. The review is organized by these topics. The research gap is described in Section 2.9.
 
 ## 2.2 Existing Digital Health Systems and Policy Logic
 
@@ -229,7 +227,7 @@ Wysa is a mental health chat app that runs in the cloud. It does not perform ins
 
 ### 2.2.3 Babyl (Babylon Rwanda)
 
-Babylon Health operated in Rwanda under the local name Babyl. This was a national telemedicine platform. It was integrated with Rwanda's Universal Health Coverage. Patients could dial a USSD code or use a mobile app to consult with doctors. The system helped users check insurance details. However, it had several issues. First, the company closed its services in 2023 when the global parent company faced financial issues. This shows that cloud-dependent services are not reliable. Second, the app needed internet access. Third, it did not provide out-of-pocket cost estimations for specific services. It also did not use on-device AI to guide users through voice queries or track their feedback.
+Babylon Health operated in Rwanda under the local name Babyl. This was a national telemedicine platform. It was integrated with Rwanda's Universal Health Coverage. Patients could dial a USSD code or use a mobile app to consult with doctors. The system helped users check insurance details. However, it had several issues. First, the company closed its services in 2023 when the global parent company faced financial issues. This shows that cloud-dependent services are not reliable. Second, the app needed internet access. Third, it did not provide out-of-pocket cost estimations for specific services. It also did not use on-device AI to guide users through queries or track their feedback.
 
 ### 2.2.4 Eden Care ProActiv App
 
@@ -253,7 +251,7 @@ eBuzima is an AI-powered health app launched by the Ministry of Health in Rwanda
 
 ### 2.2.9 Smart Access
 
-Smart Access is a mobile app used in Rwanda. It uses biometric checks to verify insurance policies at hospitals. It also helps users find nearby hospitals that accept their insurance. However, the app does not run offline. It does not provide cost estimations for specific medical services. It does not use on-device AI to guide users through voice queries.
+Smart Access is a mobile app used in Rwanda. It uses biometric checks to verify insurance policies at hospitals. It also helps users find nearby hospitals that accept their insurance. However, the app does not run offline. It does not provide cost estimations for specific medical services. It does not use on-device AI to guide users through queries.
 
 ### 2.2.10 Viamo (3-2-1 Service)
 
@@ -316,7 +314,7 @@ The UTAUT framework lists four main factors that predict whether people will use
 | UTAUT Construct | Definition | Measurement in This Study |
 |---|---|---|
 | Performance Expectancy | Does the tool improve insurance navigation outcomes? | Did the app find a cheaper clinic than searching alone? |
-| Effort Expectancy | Is the tool easy to use? | Was voice querying simple? |
+| Effort Expectancy | Is the tool easy to use? | Was text querying simple and intuitive? |
 | Facilitating Conditions | Does the context support use? | Did offline capability make you more likely to use the app? |
 | Trust and Perceived Risk | Does the user trust the AI? | Were you confident in the copay estimate? |
 
@@ -330,27 +328,21 @@ The Health Belief Model states that people will take a health action based on fo
 
 ### 2.4.1 Evidence for Mobile Health Adoption
 
-Mobile health apps have helped people in Africa get medical access, vaccinations, and hospital info (Betjeman et al., 2013). A study by Aboye et al. (2023) showed that African mobile apps mostly use SMS and voice features because internet connections are slow and smartphone use is growing. This fact supports building Ranga as an offline app that accepts voice input. However, most health apps in Africa only focus on one disease. They are not designed to navigate multiple insurance plans. This limits their usefulness for university students.
+Mobile health apps have helped people in Africa get medical access, vaccinations, and hospital info (Betjeman et al., 2013). A study by Aboye et al. (2023) showed that African mobile apps mostly use SMS and voice features because internet connections are slow and smartphone use is growing. This fact supports building Ranga as an offline app. However, most health apps in Africa only focus on one disease. They are not designed to navigate multiple insurance plans. This limits their usefulness for university students.
 
 ### 2.4.2 Regulatory and Ethical Gaps
 
 Many African countries do not have rules to regulate health apps (Bene et al., 2024). Rwanda has made progress with its National Data Protection Law (Law No. 058/2021). However, there are still no clear rules for on-device health AI. Because of this, developers must design apps safely. The app must stay inside administrative limits and avoid giving clinical medical advice.
 
-## 2.5 Acoustic Bias and Linguistic Barriers in On-Device Multimodal Systems
+## 2.5 Textual Query Variations and Syntactic Challenges in On-Device Systems
 
-### 2.5.1 Phonetic Shift and Accent Challenges in East African English
+### 2.5.1 Typographic Errors and Local Vocabulary in English Health Queries
 
-Voice apps assume that the speech engine will understand the user's voice. However, regional accents and local pronunciations make this very difficult in East Africa. This creates major errors in speech recognition (Koenecke et al., 2020).
+Text-based search interfaces assume that users will type queries with perfect spelling and canonical terms. However, users often introduce spelling mistakes, grammatical errors, and local vocabulary when typing. A study by Koenecke et al. (2020) shows how algorithmic systems struggle with regional language variations. For example, a student typing 'Baho Clinic' with a typo or referring to a clinic using local names might be misunderstood. If the system fails to parse these variations, it introduces financial risks by recommending the wrong clinics. To prevent this, Ranga implements a Jaro-Winkler string distance auto-suggestion system that queries the local database to map misspelled clinic names or specialties to canonical records before processing by the model.
 
-A study by Koenecke et al. (2020) showed that commercial speech recognition systems make many mistakes with non-native accents. Models trained on voices from rich Western countries fail to understand East African English. For example, a student saying Kacyiru Hospital or Kimisagara Health Centre with a local accent might be misunderstood by the AI model. If an app tries to guess the clinic name automatically, it introduces huge financial risks. A wrong guess can route the user to an out-of-network clinic. This makes the user pay the entire bill themselves. To prevent this, Ranga rejects automatic guessing. The app uses Gemma 4 to listen to voice queries directly. It also uses a validation screen that asks the user to clarify if the voice input is not clear.
+### 2.5.2 Local Database Auto-Suggestion and Clarification Gate
 
-### 2.5.2 Fallback Query Validation Gate and Accent Mitigation Framework
-
-The app uses a double-layer system to fix accent mistakes. The system lets users confirm what they meant.
-
-First, the app records the user's voice and passes it to Gemma 4's native audio conformer. This model turns the audio into text tokens and gives a confidence score. This score goes from zero to one. Second, the app checks if the score falls below eighty-five hundredths. If the score is too low, or if a word matches several clinics, the app halts the search. Third, the app opens a validation overlay. This screen shows the transcribed text and highlights the unclear words. It asks the user to confirm the clinic or service they meant. It lists close name matches using a Jaro-Winkler distance search in the database. It also gives a text box where the user can type the correct words. Fourth, this process turns a machine guess into a verified input. This removes the accent bias of models trained on Western voices. It ensures the recommendation module gets correct clinic tokens. This deletes the risk of sending users to the wrong clinics.
-
-We will test this system using fifty crafted voice samples. We will report these results in Research Question Four.
+To handle spelling variants, the app uses a database-level correction layer. First, the app extracts name tokens from the typed query. Second, if a token does not match any official clinic name, the database computes Jaro-Winkler similarity scores between the input token and stored clinic names. Third, if the highest score is below a threshold (e.g. ninety hundredths) but above a minimal similarity (e.g. seventy-five hundredths), the app shows an auto-suggestion dialog allowing the user to select the correct name. Fourth, this process clarifies the query dynamically before sending it to the Gemma model. This eliminates routing errors caused by spelling variations, ensuring the recommendation module receives clean canonical tokens. We will test this system using fifty crafted text samples. We will report these results in Research Question Four.
 
 ## 2.6 On-Device Language Models and Model Compression
 
@@ -358,13 +350,13 @@ We will test this system using fifty crafted voice samples. We will report these
 
 Research shows that models under four billion parameters can perform complex clinical reasoning (Nissen et al., 2025). However, this research tested models using American clinical exams. It did not test them on Rwandan insurance routing. Ranga fills this gap.
 
-Other studies prove that local deployment on phones is possible. Zou et al. (2026) built an offline psychiatric support system. Wei et al. (2025) proposed the MoPHES framework, which ran two five-hundred million parameter models on a smartphone. This framework handled triage on-device. However, a model with five hundred million parameters is too small for hard insurance tasks. This is why we chose the larger Gemma 4 E2B-it model.
+Other studies prove that local deployment on phones is possible. Zou et al. (2026) built an offline psychiatric support system. Wei et al. (2025) proposed the MoPHES framework, which ran two five-hundred million parameter models on a smartphone. This framework handled triage on-device. However, a model with five hundred million parameters is too small for hard insurance tasks. This is why we chose the larger Gemma 4 2B-it model.
 
-### 2.6.2 Android Memory Architecture and Sequential Model Loading
+### 2.6.2 Android Memory Architecture and Single Model Loading
 
-Our target phone is the Xiaomi Redmi twelve. This phone has four gigabytes of memory. The Android system takes up about one and a half to two gigabytes of this memory. This leaves only two to two and a half gigabytes of memory for the app. If we load three AI models at the same time, the phone will run out of memory. The Android system will crash the app.
+Our target phone is the Xiaomi Redmi twelve. This phone has four gigabytes of memory. The Android system takes up about one and a half to two gigabytes of this memory. This leaves only two to two and a half gigabytes of memory for the app. Loading multiple large language models at the same time would crash the app.
 
-To solve this, we removed the Whisper-tiny model. We use Gemma 4's native voice input instead. We also use a two-phase loading plan. The app never runs the models at the same time. In the first phase, the app loads the Gemma 4 model and the user interface. This takes about one and eighteen hundredths gigabytes of memory. The model processes the query and decides the clinic network. Then, the app unloads the Gemma 4 model from memory. In the second phase, the app loads the Kokoro-82M model to read the advice aloud. This takes about one hundred eighty megabytes of memory. Finally, the app unloads the Kokoro model. The highest memory used at any point is only one and eighteen hundredths gigabytes. This is safe for a phone with four gigabytes of memory.
+To solve this, we do not use sequential model loading. The app only runs a single AI model: the 4-bit quantized Gemma 4 2B-it model. Since we removed speech synthesis (Kokoro-82M) and audio input modules, the memory footprint is extremely low. When the model is loaded, it takes up only about one and eighteen hundredths gigabytes of RAM. This leaves more than one gigabyte of free memory for the operating system and user interface, ensuring the app never crashes due to memory limits.
 
 ### 2.6.3 Quantization Comparison: GGUF vs. AWQ vs. ExLlamaV2
 
@@ -407,7 +399,7 @@ Many insured patients still face high health costs because they choose the wrong
 
 ## 2.9 Explicit Research Gap
 
-No existing study or application combines the five features of Ranga. First, the app runs offline and syncs in the background. Second, it estimates costs for 7 core services across RSSB, CBHI, Eden Care, and Britam. Third, it tracks user visit feedback to personalize clinic recommendations. Fourth, it covers the 15 best hospitals in a 25-kilometer radius of the school. Fifth, it processes native speech queries on-device and uses a validation screen to resolve accent errors. No other tool handles these five features for the public. This project is designed to fill this research gap.
+No existing study or application combines the five features of Ranga. First, the app runs offline and syncs in the background. Second, it estimates costs for 7 core services across RSSB, CBHI, Eden Care, and Britam. Third, it tracks user visit feedback to personalize clinic recommendations. Fourth, it covers the 15 best hospitals in a 25-kilometer radius of the school. Fifth, it processes text queries on-device and uses a Jaro-Winkler correction layer to resolve spelling errors. No other tool handles these five features for the public. This project is designed to fill this research gap.
 
 ---
 
@@ -417,13 +409,13 @@ No existing study or application combines the five features of Ranga. First, the
 
 Four core principles guide all design decisions in this project.
 
-First, the app uses clinical query category classification. Users can speak queries and enter visit feedback. The on-device model classifies their service need and saves the feedback locally.
+First, the app uses clinical query category classification. Users can type queries and enter visit feedback. The on-device model classifies their service need and saves the feedback locally.
 
 Second, the app provides financial protection. It finds the cheapest covered clinics based on the user's plan and history. It shows copayments for 7 core services and warnings before the user travels. It avoids all medical diagnosis and prescriptions to focus only on routing.
 
 Third, the app preserves privacy. All data, searches, and rules stay on the phone. No personal information is sent to the cloud.
 
-Fourth, the app has agentic capabilities. The model classifies text and translates voices into database queries offline.
+Fourth, the app has agentic capabilities. The model classifies text and translates queries into database queries offline.
 
 ## 3.2 Research Design and Evaluation Methodology
 
@@ -445,20 +437,17 @@ We will run a statistical test to check our results. The null hypothesis states 
 flowchart TD
     A[Student Onboarding] --> B{Input Method}
     B -->|Select Insurance & Log Feedback| C[SQLite Database <br> Saved Locally]
-    B -->|English Voice Query| D[Gemma 4 E2B-it: Native Multimodal Audio <br> Sequentially Loaded]
     B -->|Text Query| E[Text Query Field]
     C --> F[Visit Feedback Saved in SQLite DB]
-    D --> G[Gemma 4 Confidence Evaluation]
-    G -->|Ambiguous or low confidence| G1[Interactive Fallback Validation Overlay <br> Student clarifies/types unclear words]
-    G1 --> H
-    G -->|High confidence| H[Cleaned Canonical Search Query]
-    E --> H
-    H --> I[Gemma 4 E2B-it Recommender]
+    E --> G{Is spelling ambiguous?}
+    G -->|Yes| G1[Jaro-Winkler DB Auto-Suggestion <br> Student selects correct name]
+    G1 --> H[Cleaned Canonical Search Query]
+    G -->|No| H
+    H --> I[Gemma 4 2B-it Recommender]
     I --> J{Lookup Local SQLite DB}
     J -->|Match Scheme & Visit History| K[Cost Recommender Module]
     K --> L[Ranked Provider Recommendations & OOP Cost Estimates]
-    L --> M[Kokoro-82M TTS]
-    M --> N[Student Sees Advice & Ranked Covered Hospitals]
+    L --> N[Student Sees Advice & Ranked Covered Hospitals]
     I -->|Emergency detected| O[SOS Module <br> Direct to 114 & ALU Duty Officer]
 ```
 
@@ -470,7 +459,7 @@ The training dataset has five hundred entries. It is split into two parts.
 
 The first part has three hundred entries. These entries contain standard insurance policies and provider networks for the 15 best hospitals. They only need formatting.
 
-The second part has two hundred entries. These entries contain custom queries and past visit feedback logs. An insurance specialist will validate this part.
+The second part has two hundred entries. These entries contain custom queries and past visit feedback logs. A professional doctor will validate this part.
 
 The dataset will not include any medical diagnoses, drug names, or medical device recommendations. The model will only handle clinic routing and network tiers.
 
@@ -478,7 +467,7 @@ A compliant entry is: I use Britam but my claim at Legacy Clinic was rejected. I
 
 ### 3.3.2 DPO Preference Dataset
 
-We will collect two hundred preference pairs. We will check annotator agreement using Cohen's Kappa. If the score is below sixty hundredths, we will ask the specialist to review the pair.
+We will collect two hundred preference pairs. We will check annotator agreement using Cohen's Kappa. If the score is below sixty hundredths, we will ask the professional doctor to review the pair.
 
 The chosen response correctly parses clinic query categories, recommends the cheapest covered facility from the 15 best hospitals, alerts about past failures, and explains pre-authorization rules. The rejected response routes the user to an out-of-network hospital, hallucinates rules, or tries to diagnose symptoms.
 
@@ -495,10 +484,9 @@ The Ranga system includes a cloud training pipeline and an on-device app.
 ```mermaid
 graph TB
     subgraph Mobile Device Flutter App
-        UI[Voice, Text, & Onboarding UI <br> Flutter Widgets]
-        PRE[Fallback Validation Gate <br> Interactive Clarification]
-        LLM[Gemma 4 E2B-it <br> 4-bit GGUF Native Audio <br> MediaPipe LLM <br> Load and Unload Each Use]
-        TTS[Kokoro-82M <br> On-Device TTS <br> Load and Unload Each Use]
+        UI[Text & Onboarding UI <br> Flutter Widgets]
+        PRE[Spelling Auto-Correction <br> Jaro-Winkler DB Search]
+        LLM[Gemma 4 2B-it <br> 4-bit GGUF Model <br> MediaPipe LLM]
         DB[(Encrypted SQLite DB <br> Providers, History & Settings)]
         COST[Cost Recommender Module <br> OOP Formula Evaluator <br> Ranks by Cost & Visit Feedback]
         SYNC[Background Sync Service <br> Delta JSON over Wi-Fi <br> Data Freshness Timestamp]
@@ -524,44 +512,28 @@ graph TB
     UI --> PRE --> LLM
     LLM --> DB
     LLM --> COST
-    COST --> TTS
-    TTS --> UI
+    COST --> UI
     LLM --> SOS
 ```
 
-### 3.4.1 Sequential Model Loading Protocol
+### 3.4.1 Model Loading Protocol
 
-The app runs two models sequentially. It never runs them at the same time.
+The app loads a single on-device model for query processing.
 
 ```mermaid
 flowchart TD
-    Start([Start Session]) --> Audio[1. Record Spoken English Query <br> Raw Audio File]
-    Audio --> LoadGemma[2. Load Gemma 4 E2B-it <br> Load 4-bit GGUF 1.1 GB into RAM]
-    LoadGemma --> NativeAudio[3. Native Multimodal Inference <br> Extract specialty & facility tokens]
-    NativeAudio --> Gate{Fallback Validation Gate <br> Is token confidence >= 0.85?}
-    Gate -->|No / Low Confidence| Clarify[Clarification Overlay <br> Student selects/types unclear words]
+    Start([Start Session]) --> Text[1. Student Inputs Text Query]
+    Text --> LoadGemma[2. Load Gemma 4 2B-it <br> Load 4-bit GGUF 1.1 GB into RAM]
+    LoadGemma --> Gate{Spelling Check <br> Is clinic/specialty ambiguous?}
+    Gate -->|Yes| Clarify[Jaro-Winkler Suggestions <br> Student selects correct term]
     Clarify --> DBQuery
-    Gate -->|Yes / High Confidence| DBQuery[Query SQLite DB <br> Fetch Policy Overrides & Patient History]
+    Gate -->|No| DBQuery[Query SQLite DB <br> Fetch Policy Overrides & Patient History]
     DBQuery --> Prompt[Assemble Prompt <br> Dynamic history & referral bypass checks]
     Prompt --> Infer[Generate Recommendation <br> Complete hospital routing recommendation]
-    Infer --> UnloadGemma[4. Unload Gemma 4 E2B-it <br> Free 1.1 GB RAM]
-    UnloadGemma --> LoadKokoro[5. Load Kokoro-82M <br> Load TTS model 100 MB into RAM]
-    LoadKokoro --> TTS[Synthesise Speech <br> Play audio recommendation details]
-    TTS --> UnloadKokoro[6. Unload Kokoro-82M <br> Free 100 MB RAM]
-    UnloadKokoro --> End([End Session <br> Render final Cost widget and list])
-
-    classDef memLoad fill:#fcdede,stroke:#e74c3c,stroke-width:2px;
-    classDef memFree fill:#d5f5e3,stroke:#27ae60,stroke-width:2px;
-    classDef normal fill:#ebf5fb,stroke:#2980b9,stroke-width:2px;
-    classDef action fill:#fef9e7,stroke:#f39c12,stroke-width:2px;
-    
-    class LoadGemma,LoadKokoro memLoad;
-    class UnloadGemma,UnloadKokoro memFree;
-    class Start,Audio,NativeAudio,Gate,DBQuery,Prompt,Infer,TTS,End normal;
-    class Clarify action;
+    Infer --> End([End Session <br> Render final Cost widget and list])
 ```
 
-Peak memory stays under one and eighteen hundredths gigabytes. This is safe for a phone with four gigabytes of memory.
+Peak memory usage stays under one and eighteen hundredths gigabytes. This is safe for a phone with four gigabytes of memory.
 
 ### 3.4.2 Offline-First Background Sync Architecture
 
@@ -596,12 +568,12 @@ flowchart TD
     subgraph A [STAGE 1 Data Preparation]
         A1[300 Pre-Validated Templates <br> + 200 Custom Query Pairs]
         A2[200 DPO Preference Pairs <br> Chosen vs Rejected]
-        A3[Insurance Specialist <br> Validates 200 Custom Pairs <br> Removes All Diagnoses & Drugs]
+        A3[Professional Doctor <br> Validates 200 Custom Pairs <br> Removes All Diagnoses & Drugs]
         A3 --> A1
     end
 
     subgraph B [STAGE 2 Supervised Fine-Tuning]
-        B1[Base Model Gemma 4 E2B-it 2B]
+        B1[Base Model Gemma 4 2B-it]
         B2[Unsloth + LoRA r=16 <br> Colab A100 GPU]
         B3[SFT Checkpoint <br> Insurance Navigation Loaded]
         A1 --> B2
@@ -625,8 +597,8 @@ flowchart TD
     end
 
     subgraph E [STAGE 5 On-Device Deployment]
-        E1[Flutter APK <br> Sequential Loading Protocol]
-        E2[Student Interaction <br> Native Speech Query Cost Recommender]
+        E1[Flutter APK <br> Single Model Loader]
+        E2[Student Interaction <br> Text Query Cost Recommender]
         D2 -->|Bundled in APK| E1
         E1 --> E2
     end
@@ -644,7 +616,7 @@ Second, the app inspects the user's three most recent sessions. It checks if the
 
 Third, the app counts successful visits. If the user has two successful visits, or if they need specialized care, the app sets the bypass referral flag to true.
 
-Fourth, the app compiles these details with a system prompt. The system prompt contains safety rules that forbid diagnosing illnesses. The final prompt contains the safety rules, user history, referral bypass status, active insurance plan, and spoken query.
+Fourth, the app compiles these details with a system prompt. The system prompt contains safety rules that forbid diagnosing illnesses. The final prompt contains the safety rules, user history, referral bypass status, active insurance plan, and typed query.
 
 We will compute the Cosine Similarity score after each session. If the history system works, it will lower the average similarity score by fifteen hundredths compared to the baseline.
 
@@ -656,7 +628,7 @@ graph TD
     B --> C{Past Visit Outcomes Check}
     C -->|Clinic X previously failed visit| D[Personalized Prompt <br> Flag CLINIC X VISIT FAILURE IN HISTORY]
     C -->|No past failures| E[Standard Prompt]
-    D --> F[Gemma 4 E2B-it]
+    D --> F[Gemma 4 2B-it]
     E --> F
     F --> G{Evaluate Candidates}
     G -->|Avoid Clinic X| H[Recommend Clinic Y <br> Explain Legacy Visit Failure in History]
@@ -670,9 +642,8 @@ graph TD
 | Specialty Classification Accuracy | % correctly classified queries into service levels vs. specialist labels | >=85% |
 | Insurance Navigation Error Rate | % queries recommending an uncovered or wrong-tier facility | <=10% |
 | DPO vs SFT Error Reduction | Chi-Square test (alpha=0.05) on navigation error counts | Statistically significant |
-| Latency Per Query | Time from query input to output on Xiaomi Redmi 12 | <=10 seconds |
+| Latency Per Query | Time from text query input to output on Xiaomi Redmi 12 | <=5 seconds |
 | Cosine Similarity Reduction (RQ2) | History vs. zero-history baseline on recurring query test set | Reduction >=0.15 |
-| Gemma 4 Audio Accent Accuracy | % correct classification of facility and specialty tokens | >=80% |
 | Peak RAM Usage | Android Profiler during maximum-load session | <=1.2 GB |
 | Battery Drain | % battery per 10-minute session | <=3% |
 
@@ -683,19 +654,17 @@ graph TD
 ```mermaid
 graph TD
     User((User))
-    InsuranceSpecialist((Insurance Specialist <br> Dataset Validator))
+    ProfessionalDoctor((Professional Doctor <br> Dataset Validator))
     System[Ranga App]
  
     User -->|Select Insurance Scheme| UC1[Select Insurance Plan]
     User -->|Log visit feedback| UC2[Record Patient Interaction & Visit History]
-    User -->|Record voice query| UC3[Search Covered Facilities via Voice]
     User -->|Type query| UC4[Search Covered Facilities via Text]
     User -->|Trigger emergency dialer| UC5[Activate SOS Safety Module]
-    InsuranceSpecialist -->|Validate pairs and remove clinical overreach| UC6[Review Dataset]
+    ProfessionalDoctor -->|Validate pairs and remove clinical overreach| UC6[Review Dataset]
  
-UC1 --> System
+    UC1 --> System
     UC2 --> System
-    UC3 --> System
     UC4 --> System
     UC5 --> System
     UC6 -.->|Offline validation| System
@@ -719,23 +688,11 @@ classDiagram
         +logFeedback(visited, accepted)
     }
 
-    class VoiceInputModule {
-        +String audioFilePath
-        +recordAudio()
-        +getAudioFile() File
-    }
-
-    class QueryValidationGate {
-        +Float confidenceThreshold
-        +checkConfidence(tokens List) Boolean
-        +promptUserClarification(unclearWords List) String
-    }
-
     class LLMInferenceEngine {
         +String modelPath
         +int maxTokens
         +loadModel()
-        +generateResponse(prompt String, audioFile File) String
+        +generateResponse(prompt String) String
         +unloadModel()
     }
 
@@ -773,10 +730,8 @@ classDiagram
         +Boolean active
     }
 
-    RecommendationSession "1" --> "1" VoiceInputModule
-    VoiceInputModule "1" --> "1" QueryValidationGate
     RecommendationSession "1" --> "1" LLMInferenceEngine
-    LLMInferenceEngine "1" --> "1" CostRecommender
+    RecommendationSession "1" --> "1" CostRecommender
     LLMInferenceEngine "1" --> "1" SOSModule
     CostRecommender "1" --> "*" Provider
     BackgroundSyncService ..> CostRecommender : updates provider data
@@ -837,11 +792,9 @@ erDiagram
 sequenceDiagram
     actor User
     participant App as Flutter App
-    participant PRE as Fallback Validation Gate
-    participant LLM as Gemma 4 E2B-it Load/Unload
     participant DB as Local SQLite DB
+    participant LLM as Gemma 4 2B-it Load/Unload
     participant COST as Cost Recommender
-    participant TTS as Kokoro-82M Load/Unload
     participant SYNC as Background Sync
  
     Note over App,SYNC: On Wi-Fi connection silent background
@@ -853,35 +806,27 @@ sequenceDiagram
     App->>DB: Store profile settings
   
     Note over User,App: Querying Phase
-    User->>App: Tap microphone & speak query
+    User->>App: Type query in search bar
     User->>App: "Where is a covered clinic for my dental treatment?"
-    App->>LLM: Load Gemma 4 E2B-it
-    App->>LLM: Pass raw audio query for native inference
-    LLM->>LLM: Extract specialty & facility tokens & evaluate confidence
-    alt Spoken facility or department token confidence < 0.85
-        LLM-->>App: Low confidence tokens flagged
-        App->>PRE: Activate Fallback Validation Overlay
-        PRE-->>User: Display clarification overlay with database matches
-        User->>PRE: Select match or type unclear words
-        PRE-->>App: Confirmed canonical facility and specialty tokens
-    else Spoken tokens are clear (confidence >= 0.85)
-        LLM-->>App: Valid tokens identified
-    end
     App->>DB: Query profile settings & past visit logs
     DB-->>App: Profile scheme and past visit outcomes
-    App->>LLM: Pass prompt with profile details, interaction history, and confirmed tokens
+    App->>DB: Check clinic name spelling similarity (Jaro-Winkler)
+    alt Typo detected or name ambiguous
+        DB-->>App: Misspelled clinic names flagged
+        App->>User: Suggest correct clinic names
+        User->>App: Select correct name
+    end
+    App->>LLM: Load Gemma 4 2B-it
+    App->>LLM: Pass prompt with profile details, interaction history, and typed query
     LLM->>LLM: Classify specialty & evaluate referral bypass eligibility
     LLM-->>App: Classified specialty and recommended provider/referral rules
-    App->>LLM: Unload Gemma 4 E2B-it
+    App->>LLM: Unload Gemma 4 2B-it
  
     App->>COST: findCoveredProviders(category, overrides)
     COST->>DB: Query active providers within 25 km & default tier rules
     DB-->>COST: Provider list with default copayment rates
     COST->>COST: Apply interaction history weights & referral bypass overrides
     COST-->>App: Top recommended provider with OOP costs, bypass status & warnings
-    App->>TTS: Load Kokoro-82M
-    TTS-->>User: Voice output of top recommendation details
-    App->>TTS: Unload Kokoro-82M
     App-->>User: Screen shows ranked cost-ranked list and sync warning
 ```
 
@@ -891,10 +836,8 @@ sequenceDiagram
 |---|---|---|
 | Flutter 3.x | Mobile Framework | Cross-platform UI for Android and iOS |
 | Dart | Programming Language | Mobile application logic |
-| MediaPipe LLM | ML Runtime | Loads GGUF Gemma 4 E2B-it on-device via ARM |
-| Fallback Validation Gate | NLP Utility | Prompts user clarification for ambiguous or low-confidence tokens |
-| Kokoro-82M | TTS Engine | On-device text-to-speech, sequentially loaded |
-| Gemma 4 E2B-it | Base AI Model | Core model fine-tuned for native speech query classification & hospital recommendation |
+| MediaPipe LLM | ML Runtime | Loads GGUF Gemma 4 2B-it on-device via ARM |
+| Gemma 4 2B-it | Base AI Model | Core model fine-tuned for text query classification & hospital recommendation |
 | Unsloth | ML Training | Memory-efficient SFT with gradient checkpointing |
 | TRL Library | ML Training | DPO alignment training |
 | llama.cpp | Quantization | 4-bit GGUF compression |
@@ -905,7 +848,7 @@ sequenceDiagram
 
 ## 3.8 Chapter Summary
 
-This chapter described the design of Ranga. The project makes seven key engineering contributions. First, the validation gate fixes accent mistakes. Second, the sequential model loading protocol solves the phone memory problem. Third, the offline background sync service warns users when data is old. Fourth, the local database tracks rules and user history. Fifth, the history design helps answer Research Question Two. Sixth, the crossover test uses formal statistical methods. Finally, the app enforces strict safety rules to block drug naming and medical diagnoses.
+This chapter described the design of Ranga. The project makes seven key engineering contributions. First, the database Jaro-Winkler check corrects typographical spelling errors. Second, the single model loading configuration resolves the phone memory problem. Third, the offline background sync service warns users when data is old. Fourth, the local database tracks rules and user history. Fifth, the history design helps answer Research Question Two. Sixth, the crossover test uses formal statistical methods. Finally, the app enforces strict safety rules to block drug naming and medical diagnoses.
 
 ---
 
@@ -976,8 +919,6 @@ Google DeepMind. (2026a). *Gemma 4 model overview*. Google AI for Developers. ht
 Google DeepMind. (2026b). *Gemma 4: Technical report*. Google DeepMind. https://deepmind.google/models/gemma
 
 Habimana, L., Bazzett-Matabele, L., Hebert, K., Fillion, G., Rulisa, S., & Goodman, A. (2022). Does community-based health insurance protect women from financial catastrophe after cesarean section? *BMC Pregnancy and Childbirth*, 22, 419. https://doi.org/10.1186/s12884-022-04748-4
-
-Hexgrad. (2025). *Kokoro-82M: Open-weight text-to-speech model*. Hugging Face. https://huggingface.co/hexgrad/Kokoro-82M
 
 Holden, R. J., & Karsh, B.-T. (2010). The Technology Acceptance Model: Its past and its future in health care. *Journal of Biomedical Informatics*, 43(1), 159-172. https://doi.org/10.1016/j.jbi.2009.07.002
 

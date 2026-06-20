@@ -6,6 +6,7 @@ import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:path_provider/path_provider.dart';
 import 'database_helper.dart';
 import 'clinic_insurance_tool.dart';
+import 'hospital_navigation_tool.dart';
 
 /// Manages Gemma model lifecycle: download, initialization, inference.
 ///
@@ -387,7 +388,87 @@ class GemmaService extends ChangeNotifier {
         return;
       }
 
-      // ─── 3. NORMAL ON-DEVICE INFERENCE WITH SYSTEM FRAMING ───
+      // ─── 3. INTERCEPT FOR NEAREST / LOCATION-BASED HOSPITALS ───
+      if (lowerText.contains('nearest hospital') || 
+          lowerText.contains('close to me') || 
+          lowerText.contains('hospitals near') ||
+          lowerText.contains('hospital near') ||
+          lowerText.contains('closest hospital') ||
+          lowerText.contains('nearby hospital')) {
+        
+        final insurance = await DatabaseHelper.instance.getProfileValue('insurance', defaultValue: 'None');
+        final coverageBlock = HospitalNavigationTool.getInsuranceCoverageBlock(insurance);
+        
+        // Fn1: Get location
+        final loc = await HospitalNavigationTool.getCurrentLocation();
+        
+        // Fn2: Get nearby hospitals
+        final nearby = await HospitalNavigationTool.getNearbyHospitals(loc['lat']!, loc['lng']!, 0, coverageBlock);
+        
+        // Fn4: Rank hospitals
+        final ranked = HospitalNavigationTool.rankHospitalsByPriorityAndCost(nearby, coverageBlock);
+        
+        final response = _formatRankedHospitals(ranked, insurance);
+        final words = response.split(' ');
+        
+        for (var i = 0; i < words.length; i++) {
+          await Future.delayed(const Duration(milliseconds: 15));
+          _tokensGenerated++;
+          yield words[i] + (i == words.length - 1 ? '' : ' ');
+        }
+        return;
+      }
+
+      // ─── 4. INTERCEPT FOR CONDITION-BASED HOSPITALS ───
+      String? matchedCondition;
+      const conditions = [
+        'chest', 'heart', 'cardio', 'eye', 'vision', 'see', 'bone', 'fracture', 
+        'joint', 'muscle', 'mental', 'depression', 'anxiety', 'stress', 'teeth', 
+        'tooth', 'dental', 'child', 'kid', 'pediatr', 'pregnancy', 'pregnant', 
+        'gyn', 'skin', 'rash', 'dermat', 'emergency', 'accident', 'injury'
+      ];
+      
+      for (final cond in conditions) {
+        if (lowerText.contains(cond)) {
+          matchedCondition = cond;
+          break;
+        }
+      }
+
+      if (matchedCondition != null && (lowerText.contains('hospital') || lowerText.contains('doctor') || lowerText.contains('clinic') || lowerText.contains('where') || lowerText.contains('treat'))) {
+        final insurance = await DatabaseHelper.instance.getProfileValue('insurance', defaultValue: 'None');
+        final coverageBlock = HospitalNavigationTool.getInsuranceCoverageBlock(insurance);
+        
+        // Fn1: Get location for distance context
+        final loc = await HospitalNavigationTool.getCurrentLocation();
+        
+        // Fn3: Search hospitals by condition
+        final results = await HospitalNavigationTool.searchHospitalsByCondition(
+          matchedCondition, 
+          coverageBlock, 
+          lat: loc['lat'], 
+          lng: loc['lng']
+        );
+        
+        // Fn4: Rank hospitals
+        final ranked = HospitalNavigationTool.rankHospitalsByPriorityAndCost(results, coverageBlock);
+        
+        final response = _formatRankedHospitals(
+          ranked, 
+          insurance, 
+          conditionContext: matchedCondition
+        );
+        final words = response.split(' ');
+        
+        for (var i = 0; i < words.length; i++) {
+          await Future.delayed(const Duration(milliseconds: 15));
+          _tokensGenerated++;
+          yield words[i] + (i == words.length - 1 ? '' : ' ');
+        }
+        return;
+      }
+
+      // ─── 5. NORMAL ON-DEVICE INFERENCE WITH SYSTEM FRAMING ───
       // If it's the first message in this conversation, prepopulate or wrap with system context.
       bool isFirstMessage = true;
       if (activeConversationId != null) {
@@ -465,6 +546,62 @@ Student Question: $text''';
   double get tokensPerSecond {
     if (_generationStopwatch.elapsedMilliseconds == 0) return 0;
     return _tokensGenerated / (_generationStopwatch.elapsedMilliseconds / 1000);
+  }
+
+  /// Formats the ranked hospitals list into a highly readable markdown response.
+  String _formatRankedHospitals(List<RankedHospitalResult> ranked, String insurance, {String? conditionContext}) {
+    if (ranked.isEmpty) {
+      return '🏥 **No matching hospitals found.**\n\n'
+          'We couldn\'t find any hospitals matching your criteria. For general concerns, we recommend visiting the nearest public clinic or CHUK in central Kigali.';
+    }
+
+    final buffer = StringBuffer();
+    if (conditionContext != null) {
+      buffer.writeln('🏥 **Hospital recommendations for specialized condition: "$conditionContext"**\n');
+    } else {
+      buffer.writeln('🏥 **Hospitals near your location**\n');
+    }
+    buffer.writeln('Using your profile insurance: **$insurance**\n');
+
+    // Show top 3 recommended hospitals
+    final limit = ranked.length < 3 ? ranked.length : 3;
+    for (var i = 0; i < limit; i++) {
+      final r = ranked[i];
+      final h = r.result.hospital;
+      final networkStatus = r.result.isInNetwork ? '✅ In-Network' : '⚠️ Out-of-Network';
+      
+      buffer.writeln('### ${i + 1}. ${h.name}');
+      buffer.writeln('📍 **Location:** ${h.address} (${h.district}, ${h.province}) — **${r.result.distanceKm.toStringAsFixed(1)} km away**');
+      buffer.writeln('🛡️ **Insurance:** $networkStatus');
+      buffer.writeln('💵 **Estimated Patient Copay:** ${r.estimatedCopayRwf} RWF');
+      
+      final ratingStr = h.ratingCount > 0 
+          ? '⭐ ${h.averageRating.toStringAsFixed(1)} (${h.ratingCount} reviews)'
+          : '⭐ No community reviews yet';
+      buffer.writeln('💬 **Community Rating:** $ratingStr');
+      buffer.writeln('⏰ **Hours:** ${h.openingHours ?? "N/A"}');
+      if (h.phone != null) {
+        buffer.writeln('📞 **Phone:** ${h.phone}');
+      }
+      buffer.writeln('🔬 **Specialties:** ${h.specialties.join(", ")}');
+      buffer.writeln('📝 *${r.scoreExplanation}*');
+      
+      // Verification code for rating/cost submission
+      final verificationCode = HospitalNavigationTool.generateVerificationCode();
+      buffer.writeln('\n✍️ *To submit a rating or actual cost for this hospital, use verification code:* **`$verificationCode`**');
+      buffer.writeln('\n---');
+    }
+
+    if (ranked.length > 3) {
+      buffer.writeln('\nOther nearby facilities include:');
+      for (var i = 3; i < ranked.length; i++) {
+        final r = ranked[i];
+        final h = r.result.hospital;
+        buffer.writeln('- **${h.name}** (${r.result.distanceKm.toStringAsFixed(1)} km away) | Est. Copay: ${r.estimatedCopayRwf} RWF');
+      }
+    }
+
+    return buffer.toString();
   }
 
   @override
