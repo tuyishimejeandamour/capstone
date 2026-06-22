@@ -1,0 +1,21 @@
+base_model: google/gemma-4-E2B-it
+dataset_dir: ../dataset/ranga_output
+checkpoint_dir: results/gemma4_e2b_checkpoints
+merged_dir: results/gemma4_e2b_merged
+export_dir: results/gemma4_e2b_litertlm
+reports_dir: results/reports
+
+max_seq_length: 2048
+lora_r: 16
+lora_alpha: 16
+learning_rate: 2.0e-4
+num_train_epochs: 3
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+train_split: 0.9
+max_hospitals_in_tool_payload: 2
+seed: 42
+
+# LiteRT export (matches app/lib/services/gemma_service.dart)
+litert_template: litert-community/gemma-4-E2B-it-litert-lm
+flutter_model_filename: gemma-model.litertlm
