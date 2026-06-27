@@ -1,0 +1,901 @@
+{
+    "messages":[{"role":"system","content":"You are a helpful assistant with access
+to the following functions. Use them if required -\n[\n {\n "type":
+"function",\n "function": {\n "name": "getCurrentLocation",\n "description":
+"Get the student's GPS coordinates. Returns {lat, lng}. Falls back to Kigali
+center if unavailable.",\n "parameters": { "type": "object", "properties": {}
+}\n }\n },\n {\n "type": "function",\n "function": {\n "name":
+"getInsuranceCoverageBlock",\n "description": "Look up Britam or Old Mutual
+coverage: providerName, networkKey, copayPercent, requiresReferral,
+referralNotes, coverageDetails, financialPolicyExcerpt, and limit fields.
+Insurance must be 'Britam' or 'Old Mutual'.",\n "parameters": {\n "type":
+"object",\n "properties": {\n "insurance": {\n "type": "string",\n "enum":
+["Britam", "Old Mutual"],\n "description": "Student insurance scheme — Britam or
+Old Mutual only."\n }\n },\n "required": ["insurance"]\n }\n }\n },\n {\n
+"type": "function",\n "function": {\n "name": "getNearbyHospitals",\n
+"description": "Hospitals within radiusKm of lat/lng; sorted in-network first,
+then distance.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"lat": { "type": "number" },\n "lng": { "type": "number" },\n "radiusKm": {
+"type": "number", "description": "Use 25 for Kigali." },\n "coverageBlock": {
+"type": "object", "description": "From getInsuranceCoverageBlock." }\n },\n
+"required": ["lat", "lng", "coverageBlock"]\n }\n }\n },\n {\n "type":
+"function",\n "function": {\n "name": "searchHospitalsByCondition",\n
+"description": "Hospitals matching symptom/condition keyword with optional
+lat/lng.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"condition": { "type": "string" },\n "coverageBlock": { "type": "object" },\n
+"lat": { "type": "number" },\n "lng": { "type": "number" }\n },\n "required":
+["condition", "coverageBlock"]\n }\n }\n },\n {\n "type": "function",\n
+"function": {\n "name": "rankHospitalsByPriorityAndCost",\n "description": "Rank
+by copay (RWF), distance, in-network, emergency unit, rating. Returns
+rankedResults with estimatedCopayRwf.",\n "parameters": {\n "type": "object",\n
+"properties": {\n "hospitals": { "type": "array" },\n "coverageBlock": { "type":
+"object" }\n },\n "required": ["hospitals", "coverageBlock"]\n }\n }\n },\n {\n
+"type": "function",\n "function": {\n "name": "getClinicInfo",\n "description":
+"UR Student Health Clinic (Gikondo) hours, counseling, crisis lines 112/114.",\n
+"parameters": { "type": "object", "properties": {} }\n }\n
+}\n]"},{"role":"user","content":"My wisdom tooth is throbbing so badly that I
+can't sleep or study. Is there a dental clinic
+nearby?"},{"role":"assistant","content":"I understand you're dealing with severe
+tooth pain. I will determine your location, verify your insurance plan, search
+for specialized dental clinics near Masoro, and rank them to find the best
+option."},{"role":"user","content":"I have Britam
+insurance."},{"role":"assistant","content":"[\n {\n "name":
+"getCurrentLocation",\n "arguments": {}\n
+}\n]"},{"role":"user","content":"{"lat": -1.9695,
+"lng": 30.1589}"},{"role":"assistant","content":"[\n {\n "name":
+"getInsuranceCoverageBlock",\n "arguments": {\n "insurance": "Britam"\n }\n
+}\n]"},{"role":"user","content":"{"providerName": "Britam Insurance",
+"networkKey": "britam", "copayPercent": 0.0, "requiresReferral": false,
+"referralNotes": "Inpatient 100% no co-pay schedule at network;
+pre-authorisation for elective inpatient care.", "coverageDetails": "Inpatient
+only; outpatient excluded. Direct billing at partner facilities.",
+"financialPolicyExcerpt": "0% co-pay on inpatient schedule; member/employer pays
+above family sub-limits; claims within 90 days; reasonable & customary
+charges.", "claimDeadlineDays": 90, "inpatientOnly": true, "outpatientCovered":
+false}"},{"role":"assistant","content":"[\n {\n "name":
+"searchHospitalsByCondition",\n "arguments": {\n "condition": "severe wisdom
+toothache",\n "coverageBlock": {\n "networkKey": "britam",\n
+"copayPercent": 0.0,\n "inpatientOnly": true,\n "outpatientCovered": false\n
+},\n "lat": -1.9695,\n "lng": 30.1589\n }\n
+}\n]"},{"role":"user","content":"{"results": [{"hospital": {"id": "nora_dental",
+"name": "Nora Dental Clinic", "healthcareType": "Specialized Dental Clinic",
+"district": "Ndera (Gasabo)", "phone": "+250 788 843 901", "email":
+"info@auca.ac.rw", "acceptedInsurance": ["britam", "oldmutual"],
+"averageCostRwf": 20000}, "distanceKm": 1.5, "isInNetwork":
+true}]}"},{"role":"assistant","content":"[\n {\n "name":
+"rankHospitalsByPriorityAndCost",\n "arguments": {\n "hospitals": [\n {\n
+"hospital": {\n "id": "nora_dental",\n "name": "Nora Dental Clinic",\n
+"healthcareType": "Specialized Dental Clinic",\n "district": "Ndera (Gasabo)",\n
+"phone": "+250 788 843 901",\n "email": "info@auca.ac.rw",\n
+"acceptedInsurance": ["britam", "oldmutual"],\n "averageCostRwf": 20000\n },\n
+"distanceKm": 1.5,\n "isInNetwork": true\n }\n ],\n "coverageBlock": {\n
+"networkKey": "britam",\n "copayPercent": 0.0,\n "inpatientOnly": true,\n
+"outpatientCovered": false\n }\n }\n
+}\n]"},{"role":"user","content":"{"rankedResults": [{"result": {"hospital":
+{"name": "Nora Dental Clinic", "phone": "+250 788 843 901"}, "distanceKm": 1.5,
+"isInNetwork": true}, "score": 90.0, "estimatedCopayRwf": 20000,
+"scoreExplanation": "In-network dental clinic but Britam excludes outpatient
+services. Outpatient checkups require 100% upfront payment of 20000
+RWF."}]}"},{"role":"assistant","content":"I recommend Nora Dental Clinic in
+Ndera (1.5 km from Masoro) for your toothache. You can contact them at
++250 788 843 901 or info@auca.ac.rw. Because your Britam plan is inpatient-only
+(outpatient care is strictly excluded), you will be fully responsible for the
+outpatient clinic fee of approximately 20,000 RWF. However, if an inpatient oral
+surgery is required, Britam covers it at 100% with a 0% co-pay, provided you
+obtain pre-authorisation and submit original claims within 90 days. Please
+present your Britam membership card upon arrival. Please note that I am an AI
+assistant and not a medical professional; consult a qualified dentist to
+evaluate your
+tooth."}],"tools":[{"type":"function","function":{"name":"getCurrentLocation","description":"Get
+the student's GPS coordinates. Returns {lat, lng}. Falls back to Kigali center
+if
+unavailable.","parameters":{"type":"object","properties":{}}}},{"type":"function","function":{"name":"getInsuranceCoverageBlock","description":"Look
+up Britam or Old Mutual coverage: providerName, networkKey, copayPercent,
+requiresReferral, referralNotes, coverageDetails, financialPolicyExcerpt, and
+limit fields. Insurance must be 'Britam' or 'Old
+Mutual'.","parameters":{"type":"object","properties":{"insurance":{"type":"string","enum":["Britam","Old
+Mutual"],"description":"Student insurance scheme — Britam or Old Mutual
+only."}},"required":["insurance"]}}},{"type":"function","function":{"name":"getNearbyHospitals","description":"Hospitals
+within radiusKm of lat/lng; sorted in-network first, then
+distance.","parameters":{"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"},"radiusKm":{"type":"number","description":"Use 25
+for Kigali."},"coverageBlock":{"type":"object","description":"From
+getInsuranceCoverageBlock."}},"required":["lat","lng","coverageBlock"]}}},{"type":"function","function":{"name":"searchHospitalsByCondition","description":"Hospitals
+matching symptom/condition keyword with optional
+lat/lng.","parameters":{"type":"object","properties":{"condition":{"type":"string"},"coverageBlock":{"type":"object"},"lat":{"type":"number"},"lng":{"type":"number"},"required":["condition","coverageBlock"]}}}},{"type":"function","function":{"name":"rankHospitalsByPriorityAndCost","description":"Rank
+by copay (RWF), distance, in-network, emergency unit, rating. Returns
+rankedResults with
+estimatedCopayRwf.","parameters":{"type":"object","properties":{"hospitals":{"type":"array"},"coverageBlock":{"type":"object"}},"required":["hospitals","coverageBlock"]}}},{"type":"function","function":{"name":"getClinicInfo","description":"UR
+Student Health Clinic (Gikondo) hours, counseling, crisis
+lines 112/114.","parameters":{"type":"object","properties":{}}}}],"text":"<start_of_turn>user\nYou
+are a helpful assistant with access to the following functions. Use them if
+required -\n[\n {\n "type": "function",\n "function": {\n "name":
+"getCurrentLocation",\n "description": "Get the student's GPS coordinates.
+Returns {lat, lng}. Falls back to Kigali center if unavailable.",\n
+"parameters": { "type": "object", "properties": {} }\n }\n },\n {\n "type":
+"function",\n "function": {\n "name": "getInsuranceCoverageBlock",\n
+"description": "Look up Britam or Old Mutual coverage: providerName, networkKey,
+copayPercent, requiresReferral, referralNotes, coverageDetails,
+financialPolicyExcerpt, and limit fields. Insurance must be 'Britam' or 'Old
+Mutual'.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"insurance": {\n "type": "string",\n "enum": ["Britam", "Old Mutual"],\n
+"description": "Student insurance scheme — Britam or Old Mutual only."\n }\n
+},\n "required": ["insurance"]\n }\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>model\nOkay, got
+it!\n<end_of_turn>\n<start_of_turn>user\nMy wisdom tooth is throbbing so badly
+that I can't sleep or study. Is there a dental clinic
+nearby?\n<end_of_turn>\n<start_of_turn>model\nI understand you're dealing with
+severe tooth pain. I will determine your location, verify your insurance plan,
+search for specialized dental clinics near Masoro, and rank them to find the
+best option.\n<end_of_turn>\n<start_of_turn>user\nI have Britam
+insurance.\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"getCurrentLocation",\n "arguments": {}\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"lat": -1.9695,
+"lng": 30.1589}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"getInsuranceCoverageBlock",\n "arguments": {\n "insurance": "Britam"\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"providerName": "Britam Insurance",
+"networkKey": "britam", "copayPercent": 0.0, "requiresReferral": false,
+"referralNotes": "Inpatient 100% no co-pay schedule at network;
+pre-authorisation for elective inpatient care.", "coverageDetails": "Inpatient
+only; outpatient excluded. Direct billing at partner facilities.",
+"financialPolicyExcerpt": "0% co-pay on inpatient schedule; member/employer pays
+above family sub-limits; claims within 90 days; reasonable & customary
+charges.", "claimDeadlineDays": 90, "inpatientOnly": true, "outpatientCovered":
+false}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"searchHospitalsByCondition",\n "arguments": {\n "condition": "severe wisdom
+toothache",\n "coverageBlock": {\n "networkKey": "britam",\n
+"copayPercent": 0.0,\n "inpatientOnly": true,\n "outpatientCovered": false\n
+},\n "lat": -1.9695,\n "lng": 30.1589\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"results": [{"hospital": {"id":
+"nora_dental", "name": "Nora Dental Clinic", "healthcareType": "Specialized
+Dental Clinic", "district": "Ndera (Gasabo)", "phone": "+250 788 843 901",
+"email": "info@auca.ac.rw", "acceptedInsurance": ["britam", "oldmutual"],
+"averageCostRwf": 20000}, "distanceKm": 1.5, "isInNetwork":
+true}]}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"rankHospitalsByPriorityAndCost",\n "arguments": {\n "hospitals": [\n {\n
+"hospital": {\n "id": "nora_dental",\n "name": "Nora Dental Clinic",\n
+"healthcareType": "Specialized Dental Clinic",\n "district": "Ndera (Gasabo)",\n
+"phone": "+250 788 843 901",\n "email": "info@auca.ac.rw",\n
+"acceptedInsurance": ["britam", "oldmutual"],\n "averageCostRwf": 20000\n },\n
+"distanceKm": 1.5,\n "isInNetwork": true\n }\n ],\n "coverageBlock": {\n
+"networkKey": "britam",\n "copayPercent": 0.0,\n "inpatientOnly": true,\n
+"outpatientCovered": false\n }\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"rankedResults": [{"result":
+{"hospital": {"name": "Nora Dental Clinic", "phone": "+250 788 843 901"},
+"distanceKm": 1.5, "isInNetwork": true}, "score": 90.0,
+"estimatedCopayRwf": 20000, "scoreExplanation": "In-network dental clinic but
+Britam excludes outpatient services. Outpatient checkups require 100% upfront
+payment of 20000 RWF."}]}\n<end_of_turn>\n<start_of_turn>model\nI recommend Nora
+Dental Clinic in Ndera (1.5 km from Masoro) for your toothache. You can contact
+them at +250 788 843 901 or info@auca.ac.rw. Because your Britam plan is
+inpatient-only (outpatient care is strictly excluded), you will be fully
+responsible for the outpatient clinic fee of approximately 20,000 RWF. However,
+if an inpatient oral surgery is required, Britam covers it at 100% with a 0%
+co-pay, provided you obtain pre-authorisation and submit original claims
+within 90 days. Please present your Britam membership card upon arrival. Please
+note that I am an AI assistant and not a medical professional; consult a
+qualified dentist to evaluate your tooth.\n<end_of_turn>"}
+{"messages":[{"role":"system","content":"You are a helpful assistant with access
+to the following functions. Use them if required -\n[\n {\n "type":
+"function",\n "function": {\n "name": "getCurrentLocation",\n "description":
+"Get the student's GPS coordinates. Returns {lat, lng}. Falls back to Kigali
+center if unavailable.",\n "parameters": { "type": "object", "properties": {}
+}\n }\n },\n {\n "type": "function",\n "function": {\n "name":
+"getInsuranceCoverageBlock",\n "description": "Look up Britam or Old Mutual
+coverage: providerName, networkKey, copayPercent, requiresReferral,
+referralNotes, coverageDetails, financialPolicyExcerpt, and limit fields.
+Insurance must be 'Britam' or 'Old Mutual'.",\n "parameters": {\n "type":
+"object",\n "properties": {\n "insurance": {\n "type": "string",\n "enum":
+["Britam", "Old Mutual"],\n "description": "Student insurance scheme — Britam or
+Old Mutual only."\n }\n },\n "required": ["insurance"]\n }\n }\n },\n {\n
+"type": "function",\n "function": {\n "name": "getNearbyHospitals",\n
+"description": "Hospitals within radiusKm of lat/lng; sorted in-network first,
+then distance.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"lat": { "type": "number" },\n "lng": { "type": "number" },\n "radiusKm": {
+"type": "number", "description": "Use 25 for Kigali." },\n "coverageBlock": {
+"type": "object", "description": "From getInsuranceCoverageBlock." }\n },\n
+"required": ["lat", "lng", "coverageBlock"]\n }\n }\n },\n {\n "type":
+"function",\n "function": {\n "name": "searchHospitalsByCondition",\n
+"description": "Hospitals matching symptom/condition keyword with optional
+lat/lng.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"condition": { "type": "string" },\n "coverageBlock": { "type": "object" },\n
+"lat": { "type": "number" },\n "lng": { "type": "number" }\n },\n "required":
+["condition", "coverageBlock"]\n }\n }\n },\n {\n "type": "function",\n
+"function": {\n "name": "rankHospitalsByPriorityAndCost",\n "description": "Rank
+by copay (RWF), distance, in-network, emergency unit, rating. Returns
+rankedResults with estimatedCopayRwf.",\n "parameters": {\n "type": "object",\n
+"properties": {\n "hospitals": { "type": "array" },\n "coverageBlock": { "type":
+"object" }\n },\n "required": ["hospitals", "coverageBlock"]\n }\n }\n },\n {\n
+"type": "function",\n "function": {\n "name": "getClinicInfo",\n "description":
+"UR Student Health Clinic (Gikondo) hours, counseling, crisis lines 112/114.",\n
+"parameters": { "type": "object", "properties": {} }\n }\n
+}\n]"},{"role":"user","content":"I have been having intense anxiety attacks and
+chest tightness for the past few days. I feel completely overwhelmed and need to
+see a specialist near Masoro."},{"role":"assistant","content":"I am so sorry to
+hear you're going through this. I will look up your location, verify your Old
+Mutual coverage, search for mental health and general diagnostic facilities
+nearby, and rank them to find you a safe place to seek
+care."},{"role":"user","content":"I am covered under Old
+Mutual."},{"role":"assistant","content":"[\n {\n "name": "getCurrentLocation",\n
+"arguments": {}\n }\n]"},{"role":"user","content":"{"lat": -1.9695,
+"lng": 30.1589}"},{"role":"assistant","content":"[\n {\n "name":
+"getInsuranceCoverageBlock",\n "arguments": {\n "insurance": "Old Mutual"\n }\n
+}\n]"},{"role":"user","content":"{"providerName": "Old Mutual Insurance Rwanda",
+"networkKey": "oldmutual", "copayPercent": 15.0, "requiresReferral": false,
+"referralNotes": "Corporate/retail tariff; local + EAC + India on referral.",
+"coverageDetails": "Plan-dependent inpatient/outpatient limits; tariff-based
+annual premiums.", "financialPolicyExcerpt": "Corporate outpatient family
+limit 375K–3.75M RWF; inpatient 750K–75M RWF per family; member pays costs above
+sub-limits.", "inpatientLimitRwf": 7500000,
+"outpatientLimitRwf": 1125000}"},{"role":"assistant","content":"[\n {\n "name":
+"searchHospitalsByCondition",\n "arguments": {\n "condition": "severe anxiety
+and psychiatric assessment",\n "coverageBlock": {\n "networkKey": "oldmutual",\n
+"copayPercent": 15.0\n },\n "lat": -1.9695,\n "lng": 30.1589\n }\n
+}\n]"},{"role":"user","content":"{"results": [{"hospital": {"id":
+"caraes_ndera", "name": "Caraes Ndera Neuropsychiatric Hosp.", "healthcareType":
+"Referral / Teaching Hospital", "district": "Ndera (Gasabo)", "phone":
+"+250 788 827 364", "email": "ndera.hospital@moh.gov.rw", "acceptedInsurance":
+["britam", "oldmutual"], "averageCostRwf": 15000}, "distanceKm": 2.5,
+"isInNetwork": true}]}"},{"role":"assistant","content":"[\n {\n "name":
+"rankHospitalsByPriorityAndCost",\n "arguments": {\n "hospitals": [\n {\n
+"hospital": {\n "id": "caraes_ndera",\n "name": "Caraes Ndera Neuropsychiatric
+Hosp.",\n "healthcareType": "Referral / Teaching Hospital",\n "district": "Ndera
+(Gasabo)",\n "phone": "+250 788 827 364",\n "email":
+"ndera.hospital@moh.gov.rw",\n "acceptedInsurance": ["britam", "oldmutual"],\n
+"averageCostRwf": 15000\n },\n "distanceKm": 2.5,\n "isInNetwork": true\n }\n
+],\n "coverageBlock": {\n "networkKey": "oldmutual",\n "copayPercent": 15.0\n
+}\n }\n }\n]"},{"role":"user","content":"{"rankedResults": [{"result":
+{"hospital": {"name": "Caraes Ndera Neuropsychiatric Hosp.", "phone":
+"+250 788 827 364"}, "distanceKm": 2.5, "isInNetwork": true}, "score": 95.0,
+"estimatedCopayRwf": 2250, "scoreExplanation": "Caraes Ndera is in-network for
+Old Mutual, specialized in psychiatric care, located 2.5 km away, with a 15%
+estimated copay of 2250 RWF."}]}"},{"role":"assistant","content":"I recommend
+Caraes Ndera Neuropsychiatric Hosp. in Ndera (2.5 km from Masoro) for
+specialized psychiatric care and mental health support. You can reach them at
++250 788 827 364 or ndera.hospital@moh.gov.rw. The estimated outpatient copay
+is 2,250 RWF (representing your 15% share of the base cost). Financial policy
+note: under Old Mutual corporate plans, outpatient family limits range
+from 375,000 to 3,750,000 RWF, and any costs exceeding your plan's specific
+sub-limits must be paid out of pocket. Please carry your Old Mutual membership
+card. I am an AI, not a healthcare professional; if you face an immediate mental
+health crisis, please dial 112/114 or visit the nearest emergency room
+immediately."}],"tools":[{"type":"function","function":{"name":"getCurrentLocation","description":"Get
+the student's GPS coordinates. Returns {lat, lng}. Falls back to Kigali center
+if
+unavailable.","parameters":{"type":"object","properties":{}}}},{"type":"function","function":{"name":"getInsuranceCoverageBlock","description":"Look
+up Britam or Old Mutual coverage: providerName, networkKey, copayPercent,
+requiresReferral, referralNotes, coverageDetails, financialPolicyExcerpt, and
+limit fields. Insurance must be 'Britam' or 'Old
+Mutual'.","parameters":{"type":"object","properties":{"insurance":{"type":"string","enum":["Britam","Old
+Mutual"],"description":"Student insurance scheme — Britam or Old Mutual
+only."}},"required":["insurance"]}}},{"type":"function","function":{"name":"getNearbyHospitals","description":"Hospitals
+within radiusKm of lat/lng; sorted in-network first, then
+distance.","parameters":{"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"},"radiusKm":{"type":"number","description":"Use 25
+for Kigali."},"coverageBlock":{"type":"object","description":"From
+getInsuranceCoverageBlock."}},"required":["lat","lng","coverageBlock"]}}},{"type":"function","function":{"name":"searchHospitalsByCondition","description":"Hospitals
+matching symptom/condition keyword with optional
+lat/lng.","parameters":{"type":"object","properties":{"condition":{"type":"string"},"coverageBlock":{"type":"object"},"lat":{"type":"number"},"lng":{"type":"number"},"required":["condition","coverageBlock"]}}}},{"type":"function","function":{"name":"rankHospitalsByPriorityAndCost","description":"Rank
+by copay (RWF), distance, in-network, emergency unit, rating. Returns
+rankedResults with
+estimatedCopayRwf.","parameters":{"type":"object","properties":{"hospitals":{"type":"array"},"coverageBlock":{"type":"object"}},"required":["hospitals","coverageBlock"]}}},{"type":"function","function":{"name":"getClinicInfo","description":"UR
+Student Health Clinic (Gikondo) hours, counseling, crisis
+lines 112/114.","parameters":{"type":"object","properties":{}}}}],"text":"<start_of_turn>user\nYou
+are a helpful assistant with access to the following functions. Use them if
+required -\n[\n {\n "type": "function",\n "function": {\n "name":
+"getCurrentLocation",\n "description": "Get the student's GPS coordinates.
+Returns {lat, lng}. Falls back to Kigali center if unavailable.",\n
+"parameters": { "type": "object", "properties": {} }\n }\n },\n {\n "type":
+"function",\n "function": {\n "name": "getInsuranceCoverageBlock",\n
+"description": "Look up Britam or Old Mutual coverage: providerName, networkKey,
+copayPercent, requiresReferral, referralNotes, coverageDetails,
+financialPolicyExcerpt, and limit fields. Insurance must be 'Britam' or 'Old
+Mutual'.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"insurance": {\n "type": "string",\n "enum": ["Britam", "Old Mutual"],\n
+"description": "Student insurance scheme — Britam or Old Mutual only."\n }\n
+},\n "required": ["insurance"]\n }\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>model\nOkay, got
+it!\n<end_of_turn>\n<start_of_turn>user\nI have been having intense anxiety
+attacks and chest tightness for the past few days. I feel completely overwhelmed
+and need to see a specialist near
+Masoro.\n<end_of_turn>\n<start_of_turn>model\nI am so sorry to hear you're going
+through this. I will look up your location, verify your Old Mutual coverage,
+search for mental health and general diagnostic facilities nearby, and rank them
+to find you a safe place to seek care.\n<end_of_turn>\n<start_of_turn>user\nI am
+covered under Old Mutual.\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"getCurrentLocation",\n "arguments": {}\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"lat": -1.9695,
+"lng": 30.1589}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"getInsuranceCoverageBlock",\n "arguments": {\n "insurance": "Old Mutual"\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"providerName": "Old Mutual Insurance
+Rwanda", "networkKey": "oldmutual", "copayPercent": 15.0, "requiresReferral":
+false, "referralNotes": "Corporate/retail tariff; local + EAC + India on
+referral.", "coverageDetails": "Plan-dependent inpatient/outpatient limits;
+tariff-based annual premiums.", "financialPolicyExcerpt": "Corporate outpatient
+family limit 375K–3.75M RWF; inpatient 750K–75M RWF per family; member pays
+costs above sub-limits.", "inpatientLimitRwf": 7500000,
+"outpatientLimitRwf": 1125000}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n
+"name": "searchHospitalsByCondition",\n "arguments": {\n "condition": "severe
+anxiety and psychiatric assessment",\n "coverageBlock": {\n "networkKey":
+"oldmutual",\n "copayPercent": 15.0\n },\n "lat": -1.9695,\n "lng": 30.1589\n
+}\n }\n]\n<end_of_turn>\n<start_of_turn>user\n{"results": [{"hospital": {"id":
+"caraes_ndera", "name": "Caraes Ndera Neuropsychiatric Hosp.", "healthcareType":
+"Referral / Teaching Hospital", "district": "Ndera (Gasabo)", "phone":
+"+250 788 827 364", "email": "ndera.hospital@moh.gov.rw", "acceptedInsurance":
+["britam", "oldmutual"], "averageCostRwf": 15000}, "distanceKm": 2.5,
+"isInNetwork": true}]}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"rankHospitalsByPriorityAndCost",\n "arguments": {\n "hospitals": [\n {\n
+"hospital": {\n "id": "caraes_ndera",\n "name": "Caraes Ndera Neuropsychiatric
+Hosp.",\n "healthcareType": "Referral / Teaching Hospital",\n "district": "Ndera
+(Gasabo)",\n "phone": "+250 788 827 364",\n "email":
+"ndera.hospital@moh.gov.rw",\n "acceptedInsurance": ["britam", "oldmutual"],\n
+"averageCostRwf": 15000\n },\n "distanceKm": 2.5,\n "isInNetwork": true\n }\n
+],\n "coverageBlock": {\n "networkKey": "oldmutual",\n "copayPercent": 15.0\n
+}\n }\n }\n]\n<end_of_turn>\n<start_of_turn>user\n{"rankedResults": [{"result":
+{"hospital": {"name": "Caraes Ndera Neuropsychiatric Hosp.", "phone":
+"+250 788 827 364"}, "distanceKm": 2.5, "isInNetwork": true}, "score": 95.0,
+"estimatedCopayRwf": 2250, "scoreExplanation": "Caraes Ndera is in-network for
+Old Mutual, specialized in psychiatric care, located 2.5 km away, with a 15%
+estimated copay of 2250 RWF."}]}\n<end_of_turn>\n<start_of_turn>model\nI
+recommend Caraes Ndera Neuropsychiatric Hosp. in Ndera (2.5 km from Masoro) for
+specialized psychiatric care and mental health support. You can reach them at
++250 788 827 364 or ndera.hospital@moh.gov.rw. The estimated outpatient copay
+is 2,250 RWF (representing your 15% share of the base cost). Financial policy
+note: under Old Mutual corporate plans, outpatient family limits range
+from 375,000 to 3,750,000 RWF, and any costs exceeding your plan's specific
+sub-limits must be paid out of pocket. Please carry your Old Mutual membership
+card. I am an AI, not a healthcare professional; if you face an immediate mental
+health crisis, please dial 112/114 or visit the nearest emergency room
+immediately.\n<end_of_turn>"} {"messages":[{"role":"system","content":"You are a
+helpful assistant with access to the following functions. Use them if required
+-\n[\n {\n "type": "function",\n "function": {\n "name": "getCurrentLocation",\n
+"description": "Get the student's GPS coordinates. Returns {lat, lng}. Falls
+back to Kigali center if unavailable.",\n "parameters": { "type": "object",
+"properties": {} }\n }\n },\n {\n "type": "function",\n "function": {\n "name":
+"getInsuranceCoverageBlock",\n "description": "Look up Britam or Old Mutual
+coverage: providerName, networkKey, copayPercent, requiresReferral,
+referralNotes, coverageDetails, financialPolicyExcerpt, and limit fields.
+Insurance must be 'Britam' or 'Old Mutual'.",\n "parameters": {\n "type":
+"object",\n "properties": {\n "insurance": {\n "type": "string",\n "enum":
+["Britam", "Old Mutual"],\n "description": "Student insurance scheme — Britam or
+Old Mutual only."\n }\n },\n "required": ["insurance"]\n }\n }\n },\n {\n
+"type": "function",\n "function": {\n "name": "getNearbyHospitals",\n
+"description": "Hospitals within radiusKm of lat/lng; sorted in-network first,
+then distance.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"lat": { "type": "number" },\n "lng": { "type": "number" },\n "radiusKm": {
+"type": "number", "description": "Use 25 for Kigali." },\n "coverageBlock": {
+"type": "object", "description": "From getInsuranceCoverageBlock." }\n },\n
+"required": ["lat", "lng", "coverageBlock"]\n }\n }\n },\n {\n "type":
+"function",\n "function": {\n "name": "searchHospitalsByCondition",\n
+"description": "Hospitals matching symptom/condition keyword with optional
+lat/lng.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"condition": { "type": "string" },\n "coverageBlock": { "type": "object" },\n
+"lat": { "type": "number" },\n "lng": { "type": "number" }\n },\n "required":
+["condition", "coverageBlock"]\n }\n }\n },\n {\n "type": "function",\n
+"function": {\n "name": "rankHospitalsByPriorityAndCost",\n "description": "Rank
+by copay (RWF), distance, in-network, emergency unit, rating. Returns
+rankedResults with estimatedCopayRwf.",\n "parameters": {\n "type": "object",\n
+"properties": {\n "hospitals": { "type": "array" },\n "coverageBlock": { "type":
+"object" }\n },\n "required": ["hospitals", "coverageBlock"]\n }\n }\n },\n {\n
+"type": "function",\n "function": {\n "name": "getClinicInfo",\n "description":
+"UR Student Health Clinic (Gikondo) hours, counseling, crisis lines 112/114.",\n
+"parameters": { "type": "object", "properties": {} }\n }\n
+}\n]"},{"role":"user","content":"I have a high fever and chills today. I need to
+find the nearest clinic to campus to get checked
+out."},{"role":"assistant","content":"I will assist you in locating a general
+medical clinic near ALU Masoro. I will first capture your location, confirm your
+insurance coverage, search for nearby general clinics, and rank them by
+proximity and out-of-pocket costs."},{"role":"user","content":"I'm covered under
+Britam insurance."},{"role":"assistant","content":"[\n {\n "name":
+"getCurrentLocation",\n "arguments": {}\n
+}\n]"},{"role":"user","content":"{"lat": -1.9695,
+"lng": 30.1589}"},{"role":"assistant","content":"[\n {\n "name":
+"getInsuranceCoverageBlock",\n "arguments": {\n "insurance": "Britam"\n }\n
+}\n]"},{"role":"user","content":"{"providerName": "Britam Insurance",
+"networkKey": "britam", "copayPercent": 0.0, "requiresReferral": false,
+"referralNotes": "Inpatient 100% no co-pay schedule at network;
+pre-authorisation for elective inpatient care.", "coverageDetails": "Inpatient
+only; outpatient excluded. Direct billing at partner facilities.",
+"financialPolicyExcerpt": "0% co-pay on inpatient schedule; member/employer pays
+above family sub-limits; claims within 90 days; reasonable & customary
+charges.", "claimDeadlineDays": 90, "inpatientOnly": true, "outpatientCovered":
+false}"},{"role":"assistant","content":"[\n {\n "name": "getNearbyHospitals",\n
+"arguments": {\n "lat": -1.9695,\n "lng": 30.1589,\n "radiusKm": 25,\n
+"coverageBlock": {\n "networkKey": "britam",\n "copayPercent": 0.0,\n
+"inpatientOnly": true,\n "outpatientCovered": false\n }\n }\n
+}\n]"},{"role":"user","content":"{"results": [{"hospital": {"id":
+"legacy_clinics", "name": "Legacy Clinics & Diagnostics", "healthcareType":
+"Premium Multi-Specialty Clinic", "district": "Nyarugunga (Kicukiro)", "phone":
+"+250 788 122 100", "email": "info@legacyclinics.rw", "acceptedInsurance":
+["britam", "oldmutual"], "averageCostRwf": 25000}, "distanceKm": 4.0,
+"isInNetwork": true}, {"hospital": {"id": "bella_vitae", "name": "Bella Vitae
+Medical Clinic", "healthcareType": "Private General Clinic", "district":
+"Nyarugunga (Kicukiro)", "phone": "+250 788 605 491", "email":
+"bellavitaeclinic@gmail.com", "acceptedInsurance": ["britam", "oldmutual"],
+"averageCostRwf": 18000}, "distanceKm": 4.5, "isInNetwork":
+true}]}"},{"role":"assistant","content":"[\n {\n "name":
+"rankHospitalsByPriorityAndCost",\n "arguments": {\n "hospitals": [\n {\n
+"hospital": {\n "id": "legacy_clinics",\n "name": "Legacy Clinics &
+Diagnostics",\n "healthcareType": "Premium Multi-Specialty Clinic",\n
+"district": "Nyarugunga (Kicukiro)",\n "phone": "+250 788 122 100",\n "email":
+"info@legacyclinics.rw",\n "acceptedInsurance": ["britam", "oldmutual"],\n
+"averageCostRwf": 25000\n },\n "distanceKm": 4.0,\n "isInNetwork": true\n },\n
+{\n "hospital": {\n "id": "bella_vitae",\n "name": "Bella Vitae Medical
+Clinic",\n "healthcareType": "Private General Clinic",\n "district": "Nyarugunga
+(Kicukiro)",\n "phone": "+250 788 605 491",\n "email":
+"bellavitaeclinic@gmail.com",\n "acceptedInsurance": ["britam", "oldmutual"],\n
+"averageCostRwf": 18000\n },\n "distanceKm": 4.5,\n "isInNetwork": true\n }\n
+],\n "coverageBlock": {\n "networkKey": "britam",\n "copayPercent": 0.0,\n
+"inpatientOnly": true,\n "outpatientCovered": false\n }\n }\n
+}\n]"},{"role":"user","content":"{"rankedResults": [{"result": {"hospital":
+{"name": "Legacy Clinics & Diagnostics", "phone": "+250 788 122 100"},
+"distanceKm": 4.0, "isInNetwork": true}, "score": 82.0,
+"estimatedCopayRwf": 25000, "scoreExplanation": "Legacy Clinics is 4.0km away.
+Because outpatient consultations are excluded from Britam contracts, the client
+must pay the full 25,000 RWF fee upfront."}]}"},{"role":"assistant","content":"I
+recommend Legacy Clinics & Diagnostics (4.0 km from Masoro) for clinical
+evaluation of your fever. You can reach them at +250 788 122 100 or
+info@legacyclinics.rw. Please keep in mind that Britam is an inpatient-only
+policy, meaning general outpatient consultations are fully excluded, so you will
+be responsible for the full consultation fee of approximately 25,000 RWF
+upfront. If you are admitted for inpatient care, Britam covers 100% of the cost.
+Ensure you present your insurance card and file original claim invoices
+within 90 days if any admitted procedures take place. I am an AI helper, not a
+clinical doctor; please consult a doctor to get properly
+examined."}],"tools":[{"type":"function","function":{"name":"getCurrentLocation","description":"Get
+the student's GPS coordinates. Returns {lat, lng}. Falls back to Kigali center
+if
+unavailable.","parameters":{"type":"object","properties":{}}}},{"type":"function","function":{"name":"getInsuranceCoverageBlock","description":"Look
+up Britam or Old Mutual coverage: providerName, networkKey, copayPercent,
+requiresReferral, referralNotes, coverageDetails, financialPolicyExcerpt, and
+limit fields. Insurance must be 'Britam' or 'Old
+Mutual'.","parameters":{"type":"object","properties":{"insurance":{"type":"string","enum":["Britam","Old
+Mutual"],"description":"Student insurance scheme — Britam or Old Mutual
+only."}},"required":["insurance"]}}},{"type":"function","function":{"name":"getNearbyHospitals","description":"Hospitals
+within radiusKm of lat/lng; sorted in-network first, then
+distance.","parameters":{"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"},"radiusKm":{"type":"number","description":"Use 25
+for Kigali."},"coverageBlock":{"type":"object","description":"From
+getInsuranceCoverageBlock."}},"required":["lat","lng","coverageBlock"]}}},{"type":"function","function":{"name":"searchHospitalsByCondition","description":"Hospitals
+matching symptom/condition keyword with optional
+lat/lng.","parameters":{"type":"object","properties":{"condition":{"type":"string"},"coverageBlock":{"type":"object"},"lat":{"type":"number"},"lng":{"type":"number"},"required":["condition","coverageBlock"]}}}},{"type":"function","function":{"name":"rankHospitalsByPriorityAndCost","description":"Rank
+by copay (RWF), distance, in-network, emergency unit, rating. Returns
+rankedResults with
+estimatedCopayRwf.","parameters":{"type":"object","properties":{"hospitals":{"type":"array"},"coverageBlock":{"type":"object"}},"required":["hospitals","coverageBlock"]}}},{"type":"function","function":{"name":"getClinicInfo","description":"UR
+Student Health Clinic (Gikondo) hours, counseling, crisis
+lines 112/114.","parameters":{"type":"object","properties":{}}}}],"text":"<start_of_turn>user\nYou
+are a helpful assistant with access to the following functions. Use them if
+required -\n[\n {\n "type": "function",\n "function": {\n "name":
+"getCurrentLocation",\n "description": "Get the student's GPS coordinates.
+Returns {lat, lng}. Falls back to Kigali center if unavailable.",\n
+"parameters": { "type": "object", "properties": {} }\n }\n },\n {\n "type":
+"function",\n "function": {\n "name": "getInsuranceCoverageBlock",\n
+"description": "Look up Britam or Old Mutual coverage: providerName, networkKey,
+copayPercent, requiresReferral, referralNotes, coverageDetails,
+financialPolicyExcerpt, and limit fields. Insurance must be 'Britam' or 'Old
+Mutual'.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"insurance": {\n "type": "string",\n "enum": ["Britam", "Old Mutual"],\n
+"description": "Student insurance scheme — Britam or Old Mutual only."\n }\n
+},\n "required": ["insurance"]\n }\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>model\nOkay, got
+it!\n<end_of_turn>\n<start_of_turn>user\nI have a high fever and chills today. I
+need to find the nearest clinic to campus to get checked
+out.\n<end_of_turn>\n<start_of_turn>model\nI will assist you in locating a
+general medical clinic near ALU Masoro. I will first capture your location,
+confirm your insurance coverage, search for nearby general clinics, and rank
+them by proximity and out-of-pocket
+costs.\n<end_of_turn>\n<start_of_turn>user\nI'm covered under Britam
+insurance.\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"getCurrentLocation",\n "arguments": {}\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"lat": -1.9695,
+"lng": 30.1589}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"getInsuranceCoverageBlock",\n "arguments": {\n "insurance": "Britam"\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"providerName": "Britam Insurance",
+"networkKey": "britam", "copayPercent": 0.0, "requiresReferral": false,
+"referralNotes": "Inpatient 100% no co-pay schedule at network;
+pre-authorisation for elective inpatient care.", "coverageDetails": "Inpatient
+only; outpatient excluded. Direct billing at partner facilities.",
+"financialPolicyExcerpt": "0% co-pay on inpatient schedule; member/employer pays
+above family sub-limits; claims within 90 days; reasonable & customary
+charges.", "claimDeadlineDays": 90, "inpatientOnly": true, "outpatientCovered":
+false}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"getNearbyHospitals",\n "arguments": {\n "lat": -1.9695,\n "lng": 30.1589,\n
+"radiusKm": 25,\n "coverageBlock": {\n "networkKey": "britam",\n
+"copayPercent": 0.0,\n "inpatientOnly": true,\n "outpatientCovered": false\n }\n
+}\n }\n]\n<end_of_turn>\n<start_of_turn>user\n{"results": [{"hospital": {"id":
+"legacy_clinics", "name": "Legacy Clinics & Diagnostics", "healthcareType":
+"Premium Multi-Specialty Clinic", "district": "Nyarugunga (Kicukiro)", "phone":
+"+250 788 122 100", "email": "info@legacyclinics.rw", "acceptedInsurance":
+["britam", "oldmutual"], "averageCostRwf": 25000}, "distanceKm": 4.0,
+"isInNetwork": true}, {"hospital": {"id": "bella_vitae", "name": "Bella Vitae
+Medical Clinic", "healthcareType": "Private General Clinic", "district":
+"Nyarugunga (Kicukiro)", "phone": "+250 788 605 491", "email":
+"bellavitaeclinic@gmail.com", "acceptedInsurance": ["britam", "oldmutual"],
+"averageCostRwf": 18000}, "distanceKm": 4.5, "isInNetwork":
+true}]}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"rankHospitalsByPriorityAndCost",\n "arguments": {\n "hospitals": [\n {\n
+"hospital": {\n "id": "legacy_clinics",\n "name": "Legacy Clinics &
+Diagnostics",\n "healthcareType": "Premium Multi-Specialty Clinic",\n
+"district": "Nyarugunga (Kicukiro)",\n "phone": "+250 788 122 100",\n "email":
+"info@legacyclinics.rw",\n "acceptedInsurance": ["britam", "oldmutual"],\n
+"averageCostRwf": 25000\n },\n "distanceKm": 4.0,\n "isInNetwork": true\n },\n
+{\n "hospital": {\n "id": "bella_vitae",\n "name": "Bella Vitae Medical
+Clinic",\n "healthcareType": "Private General Clinic",\n "district": "Nyarugunga
+(Kicukiro)",\n "phone": "+250 788 605 491",\n "email":
+"bellavitaeclinic@gmail.com",\n "acceptedInsurance": ["britam", "oldmutual"],\n
+"averageCostRwf": 18000\n },\n "distanceKm": 4.5,\n "isInNetwork": true\n }\n
+],\n "coverageBlock": {\n "networkKey": "britam",\n "copayPercent": 0.0,\n
+"inpatientOnly": true,\n "outpatientCovered": false\n }\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"rankedResults": [{"result":
+{"hospital": {"name": "Legacy Clinics & Diagnostics", "phone":
+"+250 788 122 100"}, "distanceKm": 4.0, "isInNetwork": true}, "score": 82.0,
+"estimatedCopayRwf": 25000, "scoreExplanation": "Legacy Clinics is 4.0km away.
+Because outpatient consultations are excluded from Britam contracts, the client
+must pay the full 25,000 RWF fee
+upfront."}]}\n<end_of_turn>\n<start_of_turn>model\nI recommend Legacy Clinics &
+Diagnostics (4.0 km from Masoro) for clinical evaluation of your fever. You can
+reach them at +250 788 122 100 or info@legacyclinics.rw. Please keep in mind
+that Britam is an inpatient-only policy, meaning general outpatient
+consultations are fully excluded, so you will be responsible for the full
+consultation fee of approximately 25,000 RWF upfront. If you are admitted for
+inpatient care, Britam covers 100% of the cost. Ensure you present your
+insurance card and file original claim invoices within 90 days if any admitted
+procedures take place. I am an AI helper, not a clinical doctor; please consult
+a doctor to get properly examined.\n<end_of_turn>"}
+{"messages":[{"role":"system","content":"You are a helpful assistant with access
+to the following functions. Use them if required -\n[\n {\n "type":
+"function",\n "function": {\n "name": "getCurrentLocation",\n "description":
+"Get the student's GPS coordinates. Returns {lat, lng}. Falls back to Kigali
+center if unavailable.",\n "parameters": { "type": "object", "properties": {}
+}\n }\n },\n {\n "type": "function",\n "function": {\n "name":
+"getInsuranceCoverageBlock",\n "description": "Look up Britam or Old Mutual
+coverage: providerName, networkKey, copayPercent, requiresReferral,
+referralNotes, coverageDetails, financialPolicyExcerpt, and limit fields.
+Insurance must be 'Britam' or 'Old Mutual'.",\n "parameters": {\n "type":
+"object",\n "properties": {\n "insurance": {\n "type": "string",\n "enum":
+["Britam", "Old Mutual"],\n "description": "Student insurance scheme — Britam or
+Old Mutual only."\n }\n },\n "required": ["insurance"]\n }\n }\n },\n {\n
+"type": "function",\n "function": {\n "name": "getNearbyHospitals",\n
+"description": "Hospitals within radiusKm of lat/lng; sorted in-network first,
+then distance.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"lat": { "type": "number" },\n "lng": { "type": "number" },\n "radiusKm": {
+"type": "number", "description": "Use 25 for Kigali." },\n "coverageBlock": {
+"type": "object", "description": "From getInsuranceCoverageBlock." }\n },\n
+"required": ["lat", "lng", "coverageBlock"]\n }\n }\n },\n {\n "type":
+"function",\n "function": {\n "name": "searchHospitalsByCondition",\n
+"description": "Hospitals matching symptom/condition keyword with optional
+lat/lng.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"condition": { "type": "string" },\n "coverageBlock": { "type": "object" },\n
+"lat": { "type": "number" },\n "lng": { "type": "number" }\n },\n "required":
+["condition", "coverageBlock"]\n }\n }\n },\n {\n "type": "function",\n
+"function": {\n "name": "rankHospitalsByPriorityAndCost",\n "description": "Rank
+by copay (RWF), distance, in-network, emergency unit, rating. Returns
+rankedResults with estimatedCopayRwf.",\n "parameters": {\n "type": "object",\n
+"properties": {\n "hospitals": { "type": "array" },\n "coverageBlock": { "type":
+"object" }\n },\n "required": ["hospitals", "coverageBlock"]\n }\n }\n },\n {\n
+"type": "function",\n "function": {\n "name": "getClinicInfo",\n "description":
+"UR Student Health Clinic (Gikondo) hours, counseling, crisis lines 112/114.",\n
+"parameters": { "type": "object", "properties": {} }\n }\n
+}\n]"},{"role":"user","content":"I need to find a medical clinic that has
+prenatal and maternity consultations nearby. Can you find one close to
+Rusororo?"},{"role":"assistant","content":"I would be glad to help you find
+maternity services. I'll identify your current coordinates, query your Old
+Mutual policy parameters, search for maternity clinics, and rank them to provide
+the optimal recommendation."},{"role":"user","content":"I'm on an Old Mutual
+corporate plan."},{"role":"assistant","content":"[\n {\n "name":
+"getCurrentLocation",\n "arguments": {}\n
+}\n]"},{"role":"user","content":"{"lat": -1.9695,
+"lng": 30.1589}"},{"role":"assistant","content":"[\n {\n "name":
+"getInsuranceCoverageBlock",\n "arguments": {\n "insurance": "Old Mutual"\n }\n
+}\n]"},{"role":"user","content":"{"providerName": "Old Mutual Insurance Rwanda",
+"networkKey": "oldmutual", "copayPercent": 15.0, "requiresReferral": false,
+"referralNotes": "Corporate/retail tariff; local + EAC + India on referral.",
+"coverageDetails": "Plan-dependent inpatient/outpatient limits; tariff-based
+annual premiums.", "financialPolicyExcerpt": "Corporate outpatient family
+limit 375K–3.75M RWF; inpatient 750K–75M RWF per family; member pays above
+sub-limits.", "inpatientLimitRwf": 7500000,
+"outpatientLimitRwf": 1125000}"},{"role":"assistant","content":"[\n {\n "name":
+"searchHospitalsByCondition",\n "arguments": {\n "condition": "prenatal and
+maternity consultation",\n "coverageBlock": {\n "networkKey": "oldmutual",\n
+"copayPercent": 15.0\n },\n "lat": -1.9695,\n "lng": 30.1589\n }\n
+}\n]"},{"role":"user","content":"{"results": [{"hospital": {"id": "solace",
+"name": "Solace Medical Clinic", "healthcareType": "Private Clinic & Maternity",
+"district": "Rusororo (Gasabo)", "phone": "+250 788 744 989", "email":
+"info@solaceministries.org", "acceptedInsurance": ["britam", "oldmutual"],
+"averageCostRwf": 30000}, "distanceKm": 6.5, "isInNetwork":
+true}]}"},{"role":"assistant","content":"[\n {\n "name":
+"rankHospitalsByPriorityAndCost",\n "arguments": {\n "hospitals": [\n {\n
+"hospital": {\n "id": "solace",\n "name": "Solace Medical Clinic",\n
+"healthcareType": "Private Clinic & Maternity",\n "district": "Rusororo
+(Gasabo)",\n "phone": "+250 788 744 989",\n "email":
+"info@solaceministries.org",\n "acceptedInsurance": ["britam", "oldmutual"],\n
+"averageCostRwf": 30000\n },\n "distanceKm": 6.5,\n "isInNetwork": true\n }\n
+],\n "coverageBlock": {\n "networkKey": "oldmutual",\n "copayPercent": 15.0\n
+}\n }\n }\n]"},{"role":"user","content":"{"rankedResults": [{"result":
+{"hospital": {"name": "Solace Medical Clinic", "phone": "+250 788 744 989"},
+"distanceKm": 6.5, "isInNetwork": true}, "score": 88.0,
+"estimatedCopayRwf": 4500, "scoreExplanation": "In-network for Old Mutual; 15%
+estimated copay of 30,000 RWF is 4,500
+RWF."}]}"},{"role":"assistant","content":"I recommend Solace Medical Clinic in
+Rusororo (6.5 km from Masoro) for your maternity and prenatal care. You can
+reach them at +250 788 744 989 or info@solaceministries.org. Your estimated
+copay under Old Mutual is 4,500 RWF (15% of the average 30,000 RWF consultation
+and basic prenatal cost). Financial policy note: under Old Mutual corporate
+benefits, you have family outpatient limits between 375,000 and 3,750,000 RWF;
+please track your balance since members are responsible for any charges above
+sub-limits. Please remember to bring your insurance card. I am an AI, not a
+doctor; consult a qualified obstetrician or midwife for comprehensive
+care."}],"tools":[{"type":"function","function":{"name":"getCurrentLocation","description":"Get
+the student's GPS coordinates. Returns {lat, lng}. Falls back to Kigali center
+if
+unavailable.","parameters":{"type":"object","properties":{}}}},{"type":"function","function":{"name":"getInsuranceCoverageBlock","description":"Look
+up Britam or Old Mutual coverage: providerName, networkKey, copayPercent,
+requiresReferral, referralNotes, coverageDetails, financialPolicyExcerpt, and
+limit fields. Insurance must be 'Britam' or 'Old
+Mutual'.","parameters":{"type":"object","properties":{"insurance":{"type":"string","enum":["Britam","Old
+Mutual"],"description":"Student insurance scheme — Britam or Old Mutual
+only."}},"required":["insurance"]}}},{"type":"function","function":{"name":"getNearbyHospitals","description":"Hospitals
+within radiusKm of lat/lng; sorted in-network first, then
+distance.","parameters":{"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"},"radiusKm":{"type":"number","description":"Use 25
+for Kigali."},"coverageBlock":{"type":"object","description":"From
+getInsuranceCoverageBlock."}},"required":["lat","lng","coverageBlock"]}}},{"type":"function","function":{"name":"searchHospitalsByCondition","description":"Hospitals
+matching symptom/condition keyword with optional
+lat/lng.","parameters":{"type":"object","properties":{"condition":{"type":"string"},"coverageBlock":{"type":"object"},"lat":{"type":"number"},"lng":{"type":"number"},"required":["condition","coverageBlock"]}}}},{"type":"function","function":{"name":"rankHospitalsByPriorityAndCost","description":"Rank
+by copay (RWF), distance, in-network, emergency unit, rating. Returns
+rankedResults with
+estimatedCopayRwf.","parameters":{"type":"object","properties":{"hospitals":{"type":"array"},"coverageBlock":{"type":"object"}},"required":["hospitals","coverageBlock"]}}},{"type":"function","function":{"name":"getClinicInfo","description":"UR
+Student Health Clinic (Gikondo) hours, counseling, crisis
+lines 112/114.","parameters":{"type":"object","properties":{}}}}],"text":"<start_of_turn>user\nYou
+are a helpful assistant with access to the following functions. Use them if
+required -\n[\n {\n "type": "function",\n "function": {\n "name":
+"getCurrentLocation",\n "description": "Get the student's GPS coordinates.
+Returns {lat, lng}. Falls back to Kigali center if unavailable.",\n
+"parameters": { "type": "object", "properties": {} }\n }\n },\n {\n "type":
+"function",\n "function": {\n "name": "getInsuranceCoverageBlock",\n
+"description": "Look up Britam or Old Mutual coverage: providerName, networkKey,
+copayPercent, requiresReferral, referralNotes, coverageDetails,
+financialPolicyExcerpt, and limit fields. Insurance must be 'Britam' or 'Old
+Mutual'.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"insurance": {\n "type": "string",\n "enum": ["Britam", "Old Mutual"],\n
+"description": "Student insurance scheme — Britam or Old Mutual only."\n }\n
+},\n "required": ["insurance"]\n }\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>model\nOkay, got
+it!\n<end_of_turn>\n<start_of_turn>user\nI need to find a medical clinic that
+has prenatal and maternity consultations nearby. Can you find one close to
+Rusororo?\n<end_of_turn>\n<start_of_turn>model\nI would be glad to help you find
+maternity services. I'll identify your current coordinates, query your Old
+Mutual policy parameters, search for maternity clinics, and rank them to provide
+the optimal recommendation.\n<end_of_turn>\n<start_of_turn>user\nI'm on an Old
+Mutual corporate plan.\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"getCurrentLocation",\n "arguments": {}\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"lat": -1.9695,
+"lng": 30.1589}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"getInsuranceCoverageBlock",\n "arguments": {\n "insurance": "Old Mutual"\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"providerName": "Old Mutual Insurance
+Rwanda", "networkKey": "oldmutual", "copayPercent": 15.0, "requiresReferral":
+false, "referralNotes": "Corporate/retail tariff; local + EAC + India on
+referral.", "coverageDetails": "Plan-dependent inpatient/outpatient limits;
+tariff-based annual premiums.", "financialPolicyExcerpt": "Corporate outpatient
+family limit 375K–3.75M RWF; inpatient 750K–75M RWF per family; member pays
+above sub-limits.", "inpatientLimitRwf": 7500000,
+"outpatientLimitRwf": 1125000}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n
+"name": "searchHospitalsByCondition",\n "arguments": {\n "condition": "prenatal
+and maternity consultation",\n "coverageBlock": {\n "networkKey": "oldmutual",\n
+"copayPercent": 15.0\n },\n "lat": -1.9695,\n "lng": 30.1589\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"results": [{"hospital": {"id":
+"solace", "name": "Solace Medical Clinic", "healthcareType": "Private Clinic &
+Maternity", "district": "Rusororo (Gasabo)", "phone": "+250 788 744 989",
+"email": "info@solaceministries.org", "acceptedInsurance": ["britam",
+"oldmutual"], "averageCostRwf": 30000}, "distanceKm": 6.5, "isInNetwork":
+true}]}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"rankHospitalsByPriorityAndCost",\n "arguments": {\n "hospitals": [\n {\n
+"hospital": {\n "id": "solace",\n "name": "Solace Medical Clinic",\n
+"healthcareType": "Private Clinic & Maternity",\n "district": "Rusororo
+(Gasabo)",\n "phone": "+250 788 744 989",\n "email":
+"info@solaceministries.org",\n "acceptedInsurance": ["britam", "oldmutual"],\n
+"averageCostRwf": 30000\n },\n "distanceKm": 6.5,\n "isInNetwork": true\n }\n
+],\n "coverageBlock": {\n "networkKey": "oldmutual",\n "copayPercent": 15.0\n
+}\n }\n }\n]\n<end_of_turn>\n<start_of_turn>user\n{"rankedResults": [{"result":
+{"hospital": {"name": "Solace Medical Clinic", "phone": "+250 788 744 989"},
+"distanceKm": 6.5, "isInNetwork": true}, "score": 88.0,
+"estimatedCopayRwf": 4500, "scoreExplanation": "In-network for Old Mutual; 15%
+estimated copay of 30,000 RWF is 4,500
+RWF."}]}\n<end_of_turn>\n<start_of_turn>model\nI recommend Solace Medical Clinic
+in Rusororo (6.5 km from Masoro) for your maternity and prenatal care. You can
+reach them at +250 788 744 989 or info@solaceministries.org. Your estimated
+copay under Old Mutual is 4,500 RWF (15% of the average 30,000 RWF consultation
+and basic prenatal cost). Financial policy note: under Old Mutual corporate
+benefits, you have family outpatient limits between 375,000 and 3,750,000 RWF;
+please track your balance since members are responsible for any charges above
+sub-limits. Please remember to bring your insurance card. I am an AI, not a
+doctor; consult a qualified obstetrician or midwife for comprehensive
+care.\n<end_of_turn>"} {"messages":[{"role":"system","content":"You are a
+helpful assistant with access to the following functions. Use them if required
+-\n[\n {\n "type": "function",\n "function": {\n "name": "getCurrentLocation",\n
+"description": "Get the student's GPS coordinates. Returns {lat, lng}. Falls
+back to Kigali center if unavailable.",\n "parameters": { "type": "object",
+"properties": {} }\n }\n },\n {\n "type": "function",\n "function": {\n "name":
+"getInsuranceCoverageBlock",\n "description": "Look up Britam or Old Mutual
+coverage: providerName, networkKey, copayPercent, requiresReferral,
+referralNotes, coverageDetails, financialPolicyExcerpt, and limit fields.
+Insurance must be 'Britam' or 'Old Mutual'.",\n "parameters": {\n "type":
+"object",\n "properties": {\n "insurance": {\n "type": "string",\n "enum":
+["Britam", "Old Mutual"],\n "description": "Student insurance scheme — Britam or
+Old Mutual only."\n }\n },\n "required": ["insurance"]\n }\n }\n },\n {\n
+"type": "function",\n "function": {\n "name": "getNearbyHospitals",\n
+"description": "Hospitals within radiusKm of lat/lng; sorted in-network first,
+then distance.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"lat": { "type": "number" },\n "lng": { "type": "number" },\n "radiusKm": {
+"type": "number", "description": "Use 25 for Kigali." },\n "coverageBlock": {
+"type": "object", "description": "From getInsuranceCoverageBlock." }\n },\n
+"required": ["lat", "lng", "coverageBlock"]\n }\n }\n },\n {\n "type":
+"function",\n "function": {\n "name": "searchHospitalsByCondition",\n
+"description": "Hospitals matching symptom/condition keyword with optional
+lat/lng.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"condition": { "type": "string" },\n "coverageBlock": { "type": "object" },\n
+"lat": { "type": "number" },\n "lng": { "type": "number" }\n },\n "required":
+["condition", "coverageBlock"]\n }\n }\n },\n {\n "type": "function",\n
+"function": {\n "name": "rankHospitalsByPriorityAndCost",\n "description": "Rank
+by copay (RWF), distance, in-network, emergency unit, rating. Returns
+rankedResults with estimatedCopayRwf.",\n "parameters": {\n "type": "object",\n
+"properties": {\n "hospitals": { "type": "array" },\n "coverageBlock": { "type":
+"object" }\n },\n "required": ["hospitals", "coverageBlock"]\n }\n }\n },\n {\n
+"type": "function",\n "function": {\n "name": "getClinicInfo",\n "description":
+"UR Student Health Clinic (Gikondo) hours, counseling, crisis lines 112/114.",\n
+"parameters": { "type": "object", "properties": {} }\n }\n
+}\n]"},{"role":"user","content":"My roommate just sliced his hand open preparing
+dinner. It is bleeding severely and we need an emergency room
+immediately."},{"role":"assistant","content":"This is an emergency. I will
+identify your location, confirm your Britam coverage, search for fully equipped
+emergency rooms near Masoro, and rank them to route you
+safely."},{"role":"user","content":"We have
+Britam."},{"role":"assistant","content":"[\n {\n "name": "getCurrentLocation",\n
+"arguments": {}\n }\n]"},{"role":"user","content":"{"lat": -1.9695,
+"lng": 30.1589}"},{"role":"assistant","content":"[\n {\n "name":
+"getInsuranceCoverageBlock",\n "arguments": {\n "insurance": "Britam"\n }\n
+}\n]"},{"role":"user","content":"{"providerName": "Britam Insurance",
+"networkKey": "britam", "copayPercent": 0.0, "requiresReferral": false,
+"referralNotes": "Inpatient 100% no co-pay schedule at network;
+pre-authorisation for elective inpatient care.", "coverageDetails": "Inpatient
+only; outpatient excluded. Direct billing at partner facilities.",
+"financialPolicyExcerpt": "0% co-pay on inpatient schedule; member/employer pays
+above family sub-limits; claims within 90 days; reasonable & customary
+charges.", "claimDeadlineDays": 90, "inpatientOnly": true, "outpatientCovered":
+false}"},{"role":"assistant","content":"[\n {\n "name":
+"searchHospitalsByCondition",\n "arguments": {\n "condition": "severe bleeding
+emergency trauma care",\n "coverageBlock": {\n "networkKey": "britam",\n
+"copayPercent": 0.0,\n "inpatientOnly": true,\n "outpatientCovered": false\n
+},\n "lat": -1.9695,\n "lng": 30.1589\n }\n
+}\n]"},{"role":"user","content":"{"results": [{"hospital": {"id": "rmh", "name":
+"Rwanda Military Hospital (RMH)", "healthcareType": "National Referral
+Hospital", "district": "Kanombe (Kicukiro)", "phone": "+250 252 586 420",
+"email": "info@rwandamilitaryhospital.rw", "acceptedInsurance": ["britam",
+"oldmutual"], "averageCostRwf": 40000}, "distanceKm": 4.5, "isInNetwork": true},
+{"hospital": {"id": "masaka_dh", "name": "Masaka District Hospital",
+"healthcareType": "Public District Hospital", "district": "Masaka (Kicukiro)",
+"phone": "+250 728 878 194", "email": "masaka.hospital@moh.gov.rw",
+"acceptedInsurance": ["britam", "oldmutual"], "averageCostRwf": 15000},
+"distanceKm": 7.0, "isInNetwork": true}]}"},{"role":"assistant","content":"[\n
+{\n "name": "rankHospitalsByPriorityAndCost",\n "arguments": {\n "hospitals":
+[\n {\n "hospital": {\n "id": "rmh",\n "name": "Rwanda Military Hospital
+(RMH)",\n "healthcareType": "National Referral Hospital",\n "district": "Kanombe
+(Kicukiro)",\n "phone": "+250 252 586 420",\n "email":
+"info@rwandamilitaryhospital.rw",\n "acceptedInsurance": ["britam",
+"oldmutual"],\n "averageCostRwf": 40000\n },\n "distanceKm": 4.5,\n
+"isInNetwork": true\n },\n {\n "hospital": {\n "id": "masaka_dh",\n "name":
+"Masaka District Hospital",\n "healthcareType": "Public District Hospital",\n
+"district": "Masaka (Kicukiro)",\n "phone": "+250 728 878 194",\n "email":
+"masaka.hospital@moh.gov.rw",\n "acceptedInsurance": ["britam", "oldmutual"],\n
+"averageCostRwf": 15000\n },\n "distanceKm": 7.0,\n "isInNetwork": true\n }\n
+],\n "coverageBlock": {\n "networkKey": "britam",\n "copayPercent": 0.0,\n
+"inpatientOnly": true,\n "outpatientCovered": false\n }\n }\n
+}\n]"},{"role":"user","content":"{"rankedResults": [{"result": {"hospital":
+{"name": "Rwanda Military Hospital (RMH)", "phone": "+250 252 586 420"},
+"distanceKm": 4.5, "isInNetwork": true}, "score": 92.0, "estimatedCopayRwf": 0,
+"scoreExplanation": "RMH is a high-level national referral trauma center.
+Emergency trauma care requiring admission is covered at 100% under Britam
+inpatient coverage (0% copay)."}]}"},{"role":"assistant","content":"Please go to
+Rwanda Military Hospital (RMH) in Kanombe (4.5 km from Masoro) immediately.
+Contact their emergency team at +250 252 586 420 or
+info@rwandamilitaryhospital.rw. Under your Britam plan, emergency inpatient
+admissions are covered at 100% with no co-pay (0 RWF). Remember that all claims
+must be submitted with original invoices within 90 days of treatment, and
+outpatient care is excluded unless it leads directly to inpatient admission or a
+covered day surgery. Apply immediate direct pressure to the wound with a clean
+cloth while en route. I am an AI, not a doctor; please proceed to RMH right away
+for urgent
+care."}],"tools":[{"type":"function","function":{"name":"getCurrentLocation","description":"Get
+the student's GPS coordinates. Returns {lat, lng}. Falls back to Kigali center
+if
+unavailable.","parameters":{"type":"object","properties":{}}}},{"type":"function","function":{"name":"getInsuranceCoverageBlock","description":"Look
+up Britam or Old Mutual coverage: providerName, networkKey, copayPercent,
+requiresReferral, referralNotes, coverageDetails, financialPolicyExcerpt, and
+limit fields. Insurance must be 'Britam' or 'Old
+Mutual'.","parameters":{"type":"object","properties":{"insurance":{"type":"string","enum":["Britam","Old
+Mutual"],"description":"Student insurance scheme — Britam or Old Mutual
+only."}},"required":["insurance"]}}},{"type":"function","function":{"name":"getNearbyHospitals","description":"Hospitals
+within radiusKm of lat/lng; sorted in-network first, then
+distance.","parameters":{"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"},"radiusKm":{"type":"number","description":"Use 25
+for Kigali."},"coverageBlock":{"type":"object","description":"From
+getInsuranceCoverageBlock."}},"required":["lat","lng","coverageBlock"]}}},{"type":"function","function":{"name":"searchHospitalsByCondition","description":"Hospitals
+matching symptom/condition keyword with optional
+lat/lng.","parameters":{"type":"object","properties":{"condition":{"type":"string"},"coverageBlock":{"type":"object"},"lat":{"type":"number"},"lng":{"type":"number"},"required":["condition","coverageBlock"]}}}},{"type":"function","function":{"name":"rankHospitalsByPriorityAndCost","description":"Rank
+by copay (RWF), distance, in-network, emergency unit, rating. Returns
+rankedResults with
+estimatedCopayRwf.","parameters":{"type":"object","properties":{"hospitals":{"type":"array"},"coverageBlock":{"type":"object"}},"required":["hospitals","coverageBlock"]}}},{"type":"function","function":{"name":"getClinicInfo","description":"UR
+Student Health Clinic (Gikondo) hours, counseling, crisis
+lines 112/114.","parameters":{"type":"object","properties":{}}}}],"text":"<start_of_turn>user\nYou
+are a helpful assistant with access to the following functions. Use them if
+required -\n[\n {\n "type": "function",\n "function": {\n "name":
+"getCurrentLocation",\n "description": "Get the student's GPS coordinates.
+Returns {lat, lng}. Falls back to Kigali center if unavailable.",\n
+"parameters": { "type": "object", "properties": {} }\n }\n },\n {\n "type":
+"function",\n "function": {\n "name": "getInsuranceCoverageBlock",\n
+"description": "Look up Britam or Old Mutual coverage: providerName, networkKey,
+copayPercent, requiresReferral, referralNotes, coverageDetails,
+financialPolicyExcerpt, and limit fields. Insurance must be 'Britam' or 'Old
+Mutual'.",\n "parameters": {\n "type": "object",\n "properties": {\n
+"insurance": {\n "type": "string",\n "enum": ["Britam", "Old Mutual"],\n
+"description": "Student insurance scheme — Britam or Old Mutual only."\n }\n
+},\n "required": ["insurance"]\n }\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>model\nOkay, got
+it!\n<end_of_turn>\n<start_of_turn>user\nMy roommate just sliced his hand open
+preparing dinner. It is bleeding severely and we need an emergency room
+immediately.\n<end_of_turn>\n<start_of_turn>model\nThis is an emergency. I will
+identify your location, confirm your Britam coverage, search for fully equipped
+emergency rooms near Masoro, and rank them to route you
+safely.\n<end_of_turn>\n<start_of_turn>user\nWe have
+Britam.\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"getCurrentLocation",\n "arguments": {}\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"lat": -1.9695,
+"lng": 30.1589}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"getInsuranceCoverageBlock",\n "arguments": {\n "insurance": "Britam"\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"providerName": "Britam Insurance",
+"networkKey": "britam", "copayPercent": 0.0, "requiresReferral": false,
+"referralNotes": "Inpatient 100% no co-pay schedule at network;
+pre-authorisation for elective inpatient care.", "coverageDetails": "Inpatient
+only; outpatient excluded. Direct billing at partner facilities.",
+"financialPolicyExcerpt": "0% co-pay on inpatient schedule; member/employer pays
+above family sub-limits; claims within 90 days; reasonable & customary
+charges.", "claimDeadlineDays": 90, "inpatientOnly": true, "outpatientCovered":
+false}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"searchHospitalsByCondition",\n "arguments": {\n "condition": "severe bleeding
+emergency trauma care",\n "coverageBlock": {\n "networkKey": "britam",\n
+"copayPercent": 0.0,\n "inpatientOnly": true,\n "outpatientCovered": false\n
+},\n "lat": -1.9695,\n "lng": 30.1589\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"results": [{"hospital": {"id":
+"rmh", "name": "Rwanda Military Hospital (RMH)", "healthcareType": "National
+Referral Hospital", "district": "Kanombe (Kicukiro)", "phone":
+"+250 252 586 420", "email": "info@rwandamilitaryhospital.rw",
+"acceptedInsurance": ["britam", "oldmutual"], "averageCostRwf": 40000},
+"distanceKm": 4.5, "isInNetwork": true}, {"hospital": {"id": "masaka_dh",
+"name": "Masaka District Hospital", "healthcareType": "Public District
+Hospital", "district": "Masaka (Kicukiro)", "phone": "+250 728 878 194",
+"email": "masaka.hospital@moh.gov.rw", "acceptedInsurance": ["britam",
+"oldmutual"], "averageCostRwf": 15000}, "distanceKm": 7.0, "isInNetwork":
+true}]}\n<end_of_turn>\n<start_of_turn>model\n[\n {\n "name":
+"rankHospitalsByPriorityAndCost",\n "arguments": {\n "hospitals": [\n {\n
+"hospital": {\n "id": "rmh",\n "name": "Rwanda Military Hospital (RMH)",\n
+"healthcareType": "National Referral Hospital",\n "district": "Kanombe
+(Kicukiro)",\n "phone": "+250 252 586 420",\n "email":
+"info@rwandamilitaryhospital.rw",\n "acceptedInsurance": ["britam",
+"oldmutual"],\n "averageCostRwf": 40000\n },\n "distanceKm": 4.5,\n
+"isInNetwork": true\n },\n {\n "hospital": {\n "id": "masaka_dh",\n "name":
+"Masaka District Hospital",\n "healthcareType": "Public District Hospital",\n
+"district": "Masaka (Kicukiro)",\n "phone": "+250 728 878 194",\n "email":
+"masaka.hospital@moh.gov.rw",\n "acceptedInsurance": ["britam", "oldmutual"],\n
+"averageCostRwf": 15000\n },\n "distanceKm": 7.0,\n "isInNetwork": true\n }\n
+],\n "coverageBlock": {\n "networkKey": "britam",\n "copayPercent": 0.0,\n
+"inpatientOnly": true,\n "outpatientCovered": false\n }\n }\n
+}\n]\n<end_of_turn>\n<start_of_turn>user\n{"rankedResults": [{"result":
+{"hospital": {"name": "Rwanda Military Hospital (RMH)", "phone":
+"+250 252 586 420"}, "distanceKm": 4.5, "isInNetwork": true}, "score": 92.0,
+"estimatedCopayRwf": 0, "scoreExplanation": "RMH is a high-level national
+referral trauma center. Emergency trauma care requiring admission is covered
+at 100% under Britam inpatient coverage (0%
+copay)."}]}\n<end_of_turn>\n<start_of_turn>model\nPlease go to Rwanda Military
+Hospital (RMH) in Kanombe (4.5 km from Masoro) immediately. Contact their
+emergency team at +250 252 586 420 or info@rwandamilitaryhospital.rw. Under your
+Britam plan, emergency inpatient admissions are covered at 100% with no co-pay
+(0 RWF). Remember that all claims must be submitted with original invoices
+within 90 days of treatment, and outpatient care is excluded unless it leads
+directly to inpatient admission or a covered day surgery. Apply immediate direct
+pressure to the wound with a clean cloth while en route. I am an AI, not a
+doctor; please proceed to RMH right away for urgent care.\n<end_of_turn>"}

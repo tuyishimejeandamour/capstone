@@ -1,68 +1,91 @@
-# Ranga Model Training
+# Ranga Model Training (Google Colab)
 
-Two Colab notebooks fine-tune the Ranga hospital-navigation assistant on the synthetic dataset in `dataset/ranga_output/`.
+All training logic lives **inside the notebooks** — no separate Python package to install.
 
 ## Notebooks
 
-| Notebook | Model | Purpose | Phone deployment |
-|---|---|---|---|
-| [`notebooks/ranga_functiongemma_finetune.ipynb`](notebooks/ranga_functiongemma_finetune.ipynb) | `google/functiongemma-270m-it` | Research baseline — quantify tool-policy learning | **No** |
-| [`notebooks/ranga_gemma4_e2b_production.ipynb`](notebooks/ranga_gemma4_e2b_production.ipynb) | `google/gemma-4-E2B-it` | Production Android bundle | **Yes** → `.litertlm` |
+| Notebook | Model | Purpose |
+|---|---|---|
+| [`notebooks/ranga_functiongemma_finetune.ipynb`](notebooks/ranga_functiongemma_finetune.ipynb) | `google/functiongemma-270m-it` | Research baseline (tool-policy metrics) |
+| [`notebooks/ranga_gemma4_e2b_production.ipynb`](notebooks/ranga_gemma4_e2b_production.ipynb) | `google/gemma-4-E2B-it` | Production Android → `.litertlm` |
 
-## Mobile target (Flutter)
-
-The Android app loads Gemma 4 E2B via LiteRT-LM:
-
-- File: `gemma-model.litertlm` (~2.4 GB)
-- Service: `app/lib/services/gemma_service.dart`
-- Runtime: `flutter_gemma` with GPU preferred, 512-token generation cap
-
-The **production notebook** merges LoRA weights and exports `.litertlm` using [Google's Gemma 4 LiteRT guide](https://developers.google.com/edge/litert-lm/models/gemma-4).
-
-## Colab setup (both notebooks)
-
-Open from Google Drive: `My Drive/capstone/training/notebooks/` → **Open with → Google Colaboratory**.
-
-**Run order:**
-1. **Install** cell → **Runtime → Restart session**
-2. **Colab setup** cell (mounts Drive, `HF_TOKEN`, GPU check, paths)
-3. Remaining cells in order
-
-**Drive layout:**
+## Google Drive layout
 
 ```
 My Drive/capstone/
-├── training/              ← notebooks, src/, results/
+├── training/
+│   └── notebooks/          ← open these in Colab
 └── dataset/
-    └── ranga_output/      ← JSONL training files
+    └── ranga_output/       ← ranga_sft_500.csv, ranga_eval_20.csv, ranga_tools.json
 ```
 
-Add Colab secret **`HF_TOKEN`** (🔑 in left sidebar). Set runtime to **GPU**.
+## How to run
 
-## Evaluation metrics (both notebooks)
+1. Right-click notebook in Drive → **Open with → Google Colaboratory**
+2. **Runtime → Change runtime type → GPU**
+3. Colab secret **`HF_TOKEN`** (Hugging Face token with Gemma license)
+4. Run cells in order:
+   - **Install** → **Runtime → Restart session**
+   - **Ranga helpers** (all utility code)
+   - **Colab setup** (mount Drive, load data)
+   - Training / eval cells
 
-| Metric | Definition |
+Results save to `My Drive/capstone/training/results/reports/` on Drive.
+
+## Evaluation tiers
+
+Each notebook runs a **three-tier** functional eval suite (closed-loop, step-wise tool calling):
+
+| Tier | Cases | When to run |
+|---|---|---|
+| **Smoke** | 7 (5 held-out + 2 real-world) | Right after loading the model (~30s) |
+| **Standard** | 20 (`ranga_eval_20.csv`) | Baseline + post-train benchmark |
+| **Real-world** | 15 embedded scenarios | Post-train; mirrors Flutter app phrasing |
+
+Real-world scenarios cover colloquial student queries, insurance synonyms (Mutuelle/CBHI, RAMA/RSSB), nearby vs condition routing, and anti-patterns from DPO training (e.g. skipping the rank step).
+
+## Metric glossary
+
+| Metric | Meaning |
 |---|---|
-| **TOA** | Exact tool-name sequence match |
-| **PSA** | Correct `nearby` vs `condition` path |
-| **FTA** | First call is `getCurrentLocation` |
-| **RTIR** | Reaches `rankHospitalsByPriorityAndCost` |
-| **IAA** | Correct insurance argument on step 2 |
-| **MCR** | Fraction of pipeline completed |
+| **TOA** | Tool Order Accuracy — full 4-step sequence correct |
+| **PSA** | Pipeline Selection Accuracy — nearby vs condition branch |
+| **FTA** | First Tool Accuracy — starts with `getCurrentLocation` |
+| **RTIR** | Rank Tool Invocation Rate — called `rankHospitalsByPriorityAndCost` |
+| **IAA** | Insurance Argument Accuracy — correct scheme in step 2 |
+| **MCR** | Mean Completion Rate — fraction of expected steps completed |
+| **FPR** | Functional Pass Rate — TOA + PSA + rank reached (headline score) |
+| **Rank skip rate** | Reached search but never ranked (DPO anti-pattern) |
 
-Reports are saved under `training/results/reports/`.
+Step-wise accuracy (steps 1–4) shows where the model fails in the pipeline.
 
-## Local development
+## Reading eval output
 
-```bash
-cd training
-pip install -r requirements.txt
-pytest tests/ -v
-```
+After post-train eval, artifacts are written per tier under `training/results/reports/`:
+
+- `{model}_finetuned_{tier}_summary.json` — aggregate metrics
+- `{model}_finetuned_{tier}_per_case.jsonl` — per-query results + failure class
+- `{model}_finetuned_{tier}_by_category.csv` — breakdown by scheme, pipeline, service
+- `{model}_finetuned_{tier}_failures.csv` — failed cases only (for capstone appendix)
+- `{model}_finetuned_{tier}_summary.md` — paste-ready paragraph for your report
+- `{model}_metrics.png` / `{model}_steps.png` — baseline vs finetuned charts
+
+**Failure classes:** `wrong_first_tool`, `wrong_pipeline`, `wrong_insurance_arg`, `stopped_early`, `skipped_rank`, `no_tool_call`, `hallucinated_tool`
+
+## Export gate (E2B notebook only)
+
+Before `.litertlm` export, the notebook checks:
+
+- Standard FPR ≥ 70%
+- PSA relative gain ≥ 15% vs baseline
+- Real-world FPR ≥ 80%
+- Rank skip rate ≤ 10%
+
+Prints **GO** or **NO-GO**. Export runs only on GO.
 
 ## References
 
 - [Fine-tuning with FunctionGemma](https://ai.google.dev/gemma/docs/functiongemma/finetuning-with-functiongemma)
 - [Gemma 4 LiteRT-LM deployment](https://developers.google.com/edge/litert-lm/models/gemma-4)
-- [Unsloth Gemma 4 training](https://unsloth.ai/docs/models/gemma-4/train)
-- Dataset generator: `dataset/ranga_dataset_gen.ipynb`
+- Dataset generator (`dataset/ranga_dataset_gen.ipynb`) — uses [Qwen3.6-27B-MTP-GGUF](https://huggingface.co/unsloth/Qwen3.6-27B-MTP-GGUF) + [MT Samples](https://huggingface.co/datasets/harishnair04/mtsamples) seeds
+- Flutter app: `app/lib/services/gemma_service.dart`

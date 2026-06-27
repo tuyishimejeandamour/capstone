@@ -17,6 +17,6 @@ train_split: 0.9
 max_hospitals_in_tool_payload: 2
 push_to_hub: false
 
-sft_file: ranga_sft_500.jsonl
-eval_file: ranga_eval_50.jsonl
+sft_file: ranga_sft_500.csv
+eval_file: ranga_eval_20.csv
 tools_file: ranga_tools.json

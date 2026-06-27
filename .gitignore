@@ -1,12 +1,5 @@
 .venv
 /node_modules
 node_modules
-training/results/checkpoints/
-training/results/reports/
-training/results/*.png
-training/results/gemma4_e2b_checkpoints/
-training/results/gemma4_e2b_merged/
-training/results/gemma4_e2b_litertlm/
-training/results/functiongemma_checkpoints/
+training/results/
 training/.pytest_cache/
-training/**/__pycache__/

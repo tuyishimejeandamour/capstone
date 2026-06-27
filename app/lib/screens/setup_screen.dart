@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:read_pdf_text/read_pdf_text.dart';
 
 import '../services/gemma_service.dart';
@@ -100,7 +101,7 @@ class _SetupScreenState extends State<SetupScreen> {
       // Step 0: Framework init
       await widget.gemmaService.initFramework();
 
-      // Step 1: Check if model is already installed
+      // Step 1: Check if model is already installed (validates file size ≥ 2.3 GB)
       final installed = await widget.gemmaService.isModelInstalled();
 
       if (!installed) {
@@ -109,33 +110,83 @@ class _SetupScreenState extends State<SetupScreen> {
         await widget.gemmaService.downloadModel();
       }
 
-      // Step 3: Load model into CPU/GPU memory
+      // Step 2: Load model into CPU/GPU memory (has 120s timeout per backend)
       if (!mounted) return;
-      setState(() => _statusMessage = 'Warming up AI engine on memory...');
+      setState(() => _statusMessage = 'Warming up AI engine on device...');
       await widget.gemmaService.loadModel();
 
-      // Step 4: Analyze uploaded contract if present
+      // Step 3: Analyze uploaded contract if present
       final db = DatabaseHelper.instance;
       final contractPath = await db.getProfileValue('insurance_contract_path');
       if (contractPath.isNotEmpty) {
         await _analyzeContractWithGemma();
       }
 
-      // Done
+      // Done — transition to chat
       if (!mounted) return;
       setState(() => _isWorking = false);
-      
-      // Delay slightly for smooth transition
       await Future.delayed(const Duration(milliseconds: 600));
       widget.onSetupComplete();
+
     } catch (e) {
+      // Catches Dart exceptions, TimeoutException, StateError, AND PlatformException
       if (!mounted) return;
+      final msg = e.toString();
+      // Provide a friendlier message for the known LiteRT model corruption error
+      final friendlyMsg = msg.contains('TF_LITE_PREFILL_DECODE') || msg.contains('Failed to create engine')
+          ? 'Model file is corrupted or incomplete.\nTap “Delete Corrupted File\u201d below to remove it and re-download.'
+          : 'Engine setup failed:\n$msg';
       setState(() {
         _hasError = true;
         _isWorking = false;
-        _statusMessage = 'Engine setup failed: $e';
+        _statusMessage = friendlyMsg;
       });
+    } finally {
+      // Safety net: always clear the working spinner, even if an unhandled
+      // PlatformException bypassed the catch block.
+      if (mounted && _isWorking) {
+        setState(() {
+          _isWorking = false;
+          _hasError = true;
+          if (!_statusMessage.contains('failed') && !_statusMessage.contains('corrupted')) {
+            _statusMessage = 'Setup did not complete. Please retry.';
+          }
+        });
+      }
     }
+  }
+
+  /// Deletes the corrupted/incomplete model file from device storage,
+  /// then immediately restarts the engine setup to trigger a fresh download.
+  Future<void> _deleteAndRetry() async {
+    setState(() {
+      _hasError = false;
+      _isWorking = true;
+      _statusMessage = 'Deleting corrupted model file...';
+    });
+
+    try {
+      // Locate the app documents directory where flutter_gemma stores the model
+      final dir = await getApplicationDocumentsDirectory();
+      final modelFile = File('${dir.path}/gemma-model.litertlm');
+
+      if (await modelFile.exists()) {
+        await modelFile.delete();
+        debugPrint('🗑️ Deleted corrupted model file: ${modelFile.path}');
+      } else {
+        debugPrint('ℹ️ No model file found at ${modelFile.path} — skipping delete.');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Failed to delete model file: $e');
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _statusMessage = 'Model file removed. Starting fresh download...';
+    });
+
+    await Future.delayed(const Duration(milliseconds: 700));
+    _startEngineSetup();
   }
 
   /// Uses local Gemma 4 E2B model to process the uploaded contract (PDF or image).
@@ -669,13 +720,8 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
                       },
                       items: const [
                         DropdownMenuItem(value: 'None', child: Text('No Insurance / Out-of-pocket')),
-                        DropdownMenuItem(value: 'Mutuelle', child: Text('Mutuelle de Santé (CBHI)')),
-                        DropdownMenuItem(value: 'RSSB', child: Text('RSSB / RAMA')),
-                        DropdownMenuItem(value: 'MMI', child: Text('Military Medical Insurance (MMI)')),
-                        DropdownMenuItem(value: 'Sanlam', child: Text('Sanlam Insurance')),
                         DropdownMenuItem(value: 'Britam', child: Text('Britam Insurance')),
-                        DropdownMenuItem(value: 'UAP', child: Text('UAP Old Mutual')),
-                        DropdownMenuItem(value: 'Radiant', child: Text('Radiant Insurance')),
+                        DropdownMenuItem(value: 'UAP', child: Text('Old Mutual / UAP')),
                       ],
                     ),
                   ),
@@ -878,12 +924,14 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
           ),
           const Spacer(flex: 2),
 
-          // Retry Button if setup fails
+          // Error action buttons
           if (_hasError) ...[
+            const SizedBox(height: 4),
+            // Primary: Delete corrupted file and re-download
             SizedBox(
               width: double.infinity,
               child: TextButton(
-                onPressed: _startEngineSetup,
+                onPressed: _deleteAndRetry,
                 style: TextButton.styleFrom(
                   backgroundColor: _kErrorColor,
                   foregroundColor: Colors.white,
@@ -892,12 +940,44 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
                     borderRadius: BorderRadius.circular(25),
                   ),
                 ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.delete_sweep_rounded, size: 18, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text(
+                      'DELETE CORRUPTED FILE & RE-DOWNLOAD',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            // Secondary: Simple retry (no delete)
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: _startEngineSetup,
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: _kTextMuted,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                    side: BorderSide(color: Colors.white.withValues(alpha: 0.15), width: 1),
+                  ),
+                ),
                 child: const Text(
-                  'RETRY ENGINE SETUP',
+                  'RETRY WITHOUT DELETING',
                   style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),

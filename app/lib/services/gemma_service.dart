@@ -6,7 +6,7 @@ import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:path_provider/path_provider.dart';
 import 'database_helper.dart';
 import 'clinic_insurance_tool.dart';
-import 'hospital_navigation_tool.dart';
+import 'curated_hospitals.dart';
 
 /// Manages Gemma model lifecycle: download, initialization, inference.
 ///
@@ -63,17 +63,26 @@ class GemmaService extends ChangeNotifier {
   }
 
   /// Check if the model is already installed locally.
+  /// Requires the file to be at least 2.3 GB — anything smaller is an incomplete/corrupt download.
   Future<bool> isModelInstalled() async {
     if (FlutterGemma.hasActiveModel()) {
       return true;
     }
     
-    // Check if the model file is already present on disk in applicationDocumentsDirectory
+    // Check if the model file is already present on disk in applicationDocumentsDirectory.
+    // Minimum size = 2.3 GB. The full Gemma 4 E2B is ~2.59 GB.
+    // Anything below this threshold is a partial or corrupted download.
+    const int minimumValidSizeBytes = 2300 * 1024 * 1024; // 2.3 GB
     final docsDir = await getApplicationDocumentsDirectory();
     final modelFile = File('${docsDir.path}/gemma-model.litertlm');
     
-    if (await modelFile.exists() && await modelFile.length() > 1000 * 1024 * 1024) {
-      debugPrint('📡 GemmaService: Model file found on disk (${(await modelFile.length() / 1e9).toStringAsFixed(2)} GB). Registering as active...');
+    if (await modelFile.exists()) {
+      final fileSize = await modelFile.length();
+      if (fileSize < minimumValidSizeBytes) {
+        debugPrint('⚠️ GemmaService: Model file too small (${ (fileSize / 1e9).toStringAsFixed(2)} GB < 2.3 GB minimum). Treating as incomplete.');
+        return false;
+      }
+      debugPrint('📡 GemmaService: Model file found on disk (${(fileSize / 1e9).toStringAsFixed(2)} GB). Registering as active...');
       try {
         await FlutterGemma.installModel(
           modelType: ModelType.gemmaIt,
@@ -260,25 +269,34 @@ class GemmaService extends ChangeNotifier {
   Future<void> loadModel() async {
     if (_state == GemmaServiceState.loading ||
         _state == GemmaServiceState.generating) {
-      throw StateError('Cannot load while ${_state.name}.');
+      // Reset stuck loading state before retrying
+      debugPrint('⚠️ GemmaService: loadModel() called while state=${_state.name}. Resetting state to allow retry.');
+      _state = GemmaServiceState.uninitialized;
     }
     _state = GemmaServiceState.loading;
     _error = null;
     notifyListeners();
 
     try {
+      // Attempt GPU first with a 120-second timeout so it can never hang forever.
       try {
         debugPrint('📡 GemmaService: Attempting to load model with PreferredBackend.gpu...');
         _model = await FlutterGemma.getActiveModel(
           maxTokens: _maxTokens,
           preferredBackend: PreferredBackend.gpu,
+        ).timeout(
+          const Duration(seconds: 120),
+          onTimeout: () => throw TimeoutException('GPU model load timed out after 120s'),
         );
         debugPrint('✅ GemmaService: Model loaded successfully with GPU backend.');
       } catch (gpuError) {
-        debugPrint('⚠️ GemmaService: Failed to load model with GPU backend: $gpuError. Retrying with PreferredBackend.cpu...');
+        debugPrint('⚠️ GemmaService: GPU backend failed: $gpuError. Retrying with CPU...');
         _model = await FlutterGemma.getActiveModel(
           maxTokens: _maxTokens,
           preferredBackend: PreferredBackend.cpu,
+        ).timeout(
+          const Duration(seconds: 120),
+          onTimeout: () => throw TimeoutException('CPU model load timed out after 120s'),
         );
         debugPrint('✅ GemmaService: Model loaded successfully with CPU backend fallback.');
       }
@@ -343,145 +361,130 @@ class GemmaService extends ChangeNotifier {
 
     try {
       final lowerText = text.toLowerCase();
-      
-      // ─── 1. INTERCEPT FOR LOCAL CLINIC / HEALTH CENTER TOOL ───
-      if (lowerText.contains('clinic') && 
-          (lowerText.contains('hour') || 
-           lowerText.contains('phone') || 
-           lowerText.contains('open') || 
-           lowerText.contains('time') || 
-           lowerText.contains('contact') || 
-           lowerText.contains('counseling') ||
-           lowerText.contains('hotline') ||
-           lowerText.contains('crisis'))) {
-        
+
+      // ─── 1. CLINIC HOURS / COUNSELING / CRISIS ─────────────────────────────
+      if (lowerText.contains('clinic') &&
+          (lowerText.contains('hour') ||
+              lowerText.contains('phone') ||
+              lowerText.contains('open') ||
+              lowerText.contains('time') ||
+              lowerText.contains('contact') ||
+              lowerText.contains('counseling') ||
+              lowerText.contains('hotline') ||
+              lowerText.contains('crisis'))) {
         final response = ClinicInsuranceTool.getClinicHoursText();
-        final words = response.split(' ');
-        
-        for (var i = 0; i < words.length; i++) {
-          await Future.delayed(const Duration(milliseconds: 20));
-          _tokensGenerated++;
-          yield words[i] + (i == words.length - 1 ? '' : ' ');
-        }
+        yield* _streamWords(response, delayMs: 20);
         return;
       }
 
-      // ─── 2. INTERCEPT FOR LOCAL INSURANCE / HOSPITAL TOOL ───
-      if (lowerText.contains('hospital') || 
-          lowerText.contains('insurance') || 
-          lowerText.contains('er') || 
-          lowerText.contains('emergency') || 
-          lowerText.contains('aetna') || 
-          lowerText.contains('blue') || 
-          lowerText.contains('cigna') || 
-          lowerText.contains('united')) {
-        
-        final insurance = await DatabaseHelper.instance.getProfileValue('insurance', defaultValue: 'None');
-        final response = ClinicInsuranceTool.getHospitalRecommendation(insurance);
-        final words = response.split(' ');
-        
-        for (var i = 0; i < words.length; i++) {
-          await Future.delayed(const Duration(milliseconds: 20));
-          _tokensGenerated++;
-          yield words[i] + (i == words.length - 1 ? '' : ' ');
-        }
-        return;
-      }
+      // ─── 2–4. ALL HOSPITAL / CONDITION / INSURANCE QUERIES ─────────────────
+      // These ALL route exclusively to the curated list of 10 Masoro-area
+      // facilities. No Firestore lookup, no medication advice.
+      final bool isHospitalQuery =
+          lowerText.contains('hospital') ||
+          lowerText.contains('clinic') ||
+          lowerText.contains('doctor') ||
+          lowerText.contains('where') ||
+          lowerText.contains('emergency') ||
+          lowerText.contains('insurance') ||
+          lowerText.contains('near') ||
+          lowerText.contains('close') ||
+          lowerText.contains('nearest') ||
+          lowerText.contains('recommend') ||
+          lowerText.contains('facility') ||
+          lowerText.contains('treat') ||
+          lowerText.contains('er') ||
+          lowerText.contains('refer');
 
-      // ─── 3. INTERCEPT FOR NEAREST / LOCATION-BASED HOSPITALS ───
-      if (lowerText.contains('nearest hospital') || 
-          lowerText.contains('close to me') || 
-          lowerText.contains('hospitals near') ||
-          lowerText.contains('hospital near') ||
-          lowerText.contains('closest hospital') ||
-          lowerText.contains('nearby hospital')) {
-        
-        final insurance = await DatabaseHelper.instance.getProfileValue('insurance', defaultValue: 'None');
-        final coverageBlock = HospitalNavigationTool.getInsuranceCoverageBlock(insurance);
-        
-        // Fn1: Get location
-        final loc = await HospitalNavigationTool.getCurrentLocation();
-        
-        // Fn2: Get nearby hospitals
-        final nearby = await HospitalNavigationTool.getNearbyHospitals(loc['lat']!, loc['lng']!, 0, coverageBlock);
-        
-        // Fn4: Rank hospitals
-        final ranked = HospitalNavigationTool.rankHospitalsByPriorityAndCost(nearby, coverageBlock);
-        
-        final response = _formatRankedHospitals(ranked, insurance);
-        final words = response.split(' ');
-        
-        for (var i = 0; i < words.length; i++) {
-          await Future.delayed(const Duration(milliseconds: 15));
-          _tokensGenerated++;
-          yield words[i] + (i == words.length - 1 ? '' : ' ');
-        }
-        return;
-      }
-
-      // ─── 4. INTERCEPT FOR CONDITION-BASED HOSPITALS ───
-      String? matchedCondition;
-      const conditions = [
-        'chest', 'heart', 'cardio', 'eye', 'vision', 'see', 'bone', 'fracture', 
-        'joint', 'muscle', 'mental', 'depression', 'anxiety', 'stress', 'teeth', 
-        'tooth', 'dental', 'child', 'kid', 'pediatr', 'pregnancy', 'pregnant', 
-        'gyn', 'skin', 'rash', 'dermat', 'emergency', 'accident', 'injury'
+      // Condition keywords that should trigger a facility recommendation
+      const conditionKeywords = [
+        'dental', 'teeth', 'tooth', 'mouth',
+        'mental', 'psych', 'depression', 'anxiety', 'stress', 'counsel',
+        'matern', 'pregnan', 'birth', 'gynec', 'obstet',
+        'chest', 'heart', 'cardio', 'breath',
+        'bone', 'fracture', 'joint', 'muscle',
+        'eye', 'vision', 'skin', 'rash',
+        'child', 'kid', 'pediatr',
+        'accident', 'injury', 'bleeding', 'wound',
+        'lab', 'diagnost', 'scan', 'test', 'x-ray',
+        'pain', 'fever', 'sick', 'ill', 'feeling',
+        'headache', 'stomach', 'diarrhea', 'vomit',
       ];
-      
-      for (final cond in conditions) {
-        if (lowerText.contains(cond)) {
-          matchedCondition = cond;
+
+      String? detectedCondition;
+      for (final kw in conditionKeywords) {
+        if (lowerText.contains(kw)) {
+          detectedCondition = kw;
           break;
         }
       }
 
-      if (matchedCondition != null && (lowerText.contains('hospital') || lowerText.contains('doctor') || lowerText.contains('clinic') || lowerText.contains('where') || lowerText.contains('treat'))) {
-        final insurance = await DatabaseHelper.instance.getProfileValue('insurance', defaultValue: 'None');
-        final coverageBlock = HospitalNavigationTool.getInsuranceCoverageBlock(insurance);
-        
-        // Fn1: Get location for distance context
-        final loc = await HospitalNavigationTool.getCurrentLocation();
-        
-        // Fn3: Search hospitals by condition
-        final results = await HospitalNavigationTool.searchHospitalsByCondition(
-          matchedCondition, 
-          coverageBlock, 
-          lat: loc['lat'], 
-          lng: loc['lng']
-        );
-        
-        // Fn4: Rank hospitals
-        final ranked = HospitalNavigationTool.rankHospitalsByPriorityAndCost(results, coverageBlock);
-        
-        final response = _formatRankedHospitals(
-          ranked, 
-          insurance, 
-          conditionContext: matchedCondition
-        );
-        final words = response.split(' ');
-        
-        for (var i = 0; i < words.length; i++) {
-          await Future.delayed(const Duration(milliseconds: 15));
-          _tokensGenerated++;
-          yield words[i] + (i == words.length - 1 ? '' : ' ');
+      if (isHospitalQuery || detectedCondition != null) {
+        final insurance = await DatabaseHelper.instance
+            .getProfileValue('insurance', defaultValue: 'None');
+
+        List<CuratedHospital> hospitals;
+        String? conditionContext;
+
+        if (detectedCondition != null) {
+          hospitals = CuratedHospitals.forCondition(detectedCondition);
+          conditionContext = detectedCondition;
+        } else {
+          hospitals = CuratedHospitals.forInsurance(insurance);
         }
+
+        final response = CuratedHospitals.formatList(
+          hospitals,
+          insurance: insurance,
+          conditionContext: conditionContext,
+          maxShown: 3,
+        );
+        yield* _streamWords(response, delayMs: 15);
         return;
       }
 
-      // ─── 5. NORMAL ON-DEVICE INFERENCE WITH SYSTEM FRAMING ───
-      // If it's the first message in this conversation, prepopulate or wrap with system context.
+      // ─── 5. GENERAL ON-DEVICE INFERENCE (hospital-guidance framing) ─────
       bool isFirstMessage = true;
       if (activeConversationId != null) {
         final messages = await DatabaseHelper.instance.getMessages(activeConversationId);
-        // Only 1 user message means this is the first exchange
-        isFirstMessage = messages.length <= 1; 
+        isFirstMessage = messages.length <= 1;
       }
 
       String prompt = text;
       if (isFirstMessage) {
         final profileSummary = await DatabaseHelper.instance.generateStudentProfileSummary();
-        prompt = '''[SYSTEM DIRECTION: You are a Student Health Guide. You are NOT a doctor or medical professional. You DO NOT diagnose illnesses, prescribe treatments, or provide clinical medical advice. Your role is to answer health-related questions with general information, suggest safe next steps (e.g. hydration, rest, stress management, counseling, or clinic hours), and direct to proper medical care if necessary. Keep responses warm, clear, and reassuring. Always highlight that you are an AI guide, not a physician.
-Student Background Context: $profileSummary]
+        prompt = '''[SYSTEM DIRECTION — READ CAREFULLY AND FOLLOW STRICTLY:
+
+You are a Student Hospital Navigation Guide for students near Masoro, Kigali, Rwanda.
+
+YOUR ONLY JOB is to help students find the RIGHT healthcare facility from the approved list below. You are NOT a doctor. You do NOT give medical diagnoses. You do NOT recommend, name, or describe any medications, drugs, tablets, syrups, or treatments. If a student asks about medication, painkillers, antibiotics, or any drug, you MUST redirect them to the appropriate facility below instead of naming any medicine.
+
+APPROVED FACILITY LIST — Only recommend from this list, never others:
+1. Nora Dental Clinic · Ndera (Gasabo) · 1.5 km · +250 788 843 901 (Specialty: Dental/Teeth only)
+2. Caraes Ndera Neuropsychiatric Hospital · Ndera (Gasabo) · 2.5 km · +250 788 827 364 (Specialty: Mental health, neurology, psychology, stress)
+3. Legacy Clinics & Diagnostics · Nyarugunga (Kicukiro) · 4.0 km · +250 788 122 100 (General Multi-specialty)
+4. Bella Vitae Medical Clinic · Nyarugunga (Kicukiro) · 4.5 km · +250 788 605 491 (General Clinic)
+5. Rwanda Military Hospital (RMH) · Kanombe (Kicukiro) · 4.5 km · +250 252 586 420 (General Referral Hospital)
+6. Alliance Arena Clinic · Rusororo (Gasabo) · 5.5 km · +250 788 897 734 (General Clinic)
+7. Kigali Medical Center (KMC) · Kimironko (Gasabo) · 6.0 km · +250 725 084 378 (General Polyclinic)
+8. Ubuzima Polyclinic · Kimironko (Gasabo) · 6.0 km · +250 788 540 557 (General Polyclinic)
+9. Solace Medical Clinic · Rusororo (Gasabo) · 6.5 km · +250 788 744 989 (General + Specialty: Maternity/Pregnancy)
+10. Masaka District Hospital · Masaka (Kicukiro) · 7.0 km · +250 728 878 194 (General District Hospital)
+
+All facilities accept Britam and UAP (Old Mutual) insurance.
+
+RULES:
+- RECOMMEND EXACTLY THREE (3) HOSPITALS / CLINICS from the list above. No more, no less.
+- MATCH THE RECOMMENDATIONS TO THE QUERY CONTEXT:
+  * For general medical issues (e.g. headache, fever, stomachache, cough, generic pain, feeling sick): DO NOT recommend specialized dental (Nora Dental) or psychiatric (Caraes Ndera) clinics. Instead, select general medical clinics or hospitals (e.g., Legacy Clinics, Bella Vitae, Rwanda Military Hospital).
+  * For dental/teeth issues: Recommend Nora Dental Clinic as the primary option, plus two general clinics.
+  * For mental health/stress/anxiety issues: Recommend Caraes Ndera neuropsychiatric hospital as the primary option, plus two general clinics.
+  * For pregnancy/maternity issues: Recommend Solace Medical Clinic as a primary option.
+- NEVER suggest any medication, drug, or treatment by name.
+- Keep your response warm, clear, and concise.
+- Always remind the student you are a navigation guide, not a medical professional.
+
+Student Background: $profileSummary]
 
 Student Question: $text''';
       }
@@ -540,6 +543,17 @@ Student Question: $text''';
   }
 
   /// Get the model description.
+  /// Streams a pre-built [text] response word-by-word with a [delayMs] between
+  /// each word, incrementing [_tokensGenerated] for perf tracking.
+  Stream<String> _streamWords(String text, {int delayMs = 15}) async* {
+    final words = text.split(' ');
+    for (var i = 0; i < words.length; i++) {
+      await Future.delayed(Duration(milliseconds: delayMs));
+      _tokensGenerated++;
+      yield words[i] + (i == words.length - 1 ? '' : ' ');
+    }
+  }
+
   String get backendInfo => 'Gemma 4 E2B';
 
   /// Tokens per second from the last generation.
@@ -548,61 +562,7 @@ Student Question: $text''';
     return _tokensGenerated / (_generationStopwatch.elapsedMilliseconds / 1000);
   }
 
-  /// Formats the ranked hospitals list into a highly readable markdown response.
-  String _formatRankedHospitals(List<RankedHospitalResult> ranked, String insurance, {String? conditionContext}) {
-    if (ranked.isEmpty) {
-      return '🏥 **No matching hospitals found.**\n\n'
-          'We couldn\'t find any hospitals matching your criteria. For general concerns, we recommend visiting the nearest public clinic or CHUK in central Kigali.';
-    }
 
-    final buffer = StringBuffer();
-    if (conditionContext != null) {
-      buffer.writeln('🏥 **Hospital recommendations for specialized condition: "$conditionContext"**\n');
-    } else {
-      buffer.writeln('🏥 **Hospitals near your location**\n');
-    }
-    buffer.writeln('Using your profile insurance: **$insurance**\n');
-
-    // Show top 3 recommended hospitals
-    final limit = ranked.length < 3 ? ranked.length : 3;
-    for (var i = 0; i < limit; i++) {
-      final r = ranked[i];
-      final h = r.result.hospital;
-      final networkStatus = r.result.isInNetwork ? '✅ In-Network' : '⚠️ Out-of-Network';
-      
-      buffer.writeln('### ${i + 1}. ${h.name}');
-      buffer.writeln('📍 **Location:** ${h.address} (${h.district}, ${h.province}) — **${r.result.distanceKm.toStringAsFixed(1)} km away**');
-      buffer.writeln('🛡️ **Insurance:** $networkStatus');
-      buffer.writeln('💵 **Estimated Patient Copay:** ${r.estimatedCopayRwf} RWF');
-      
-      final ratingStr = h.ratingCount > 0 
-          ? '⭐ ${h.averageRating.toStringAsFixed(1)} (${h.ratingCount} reviews)'
-          : '⭐ No community reviews yet';
-      buffer.writeln('💬 **Community Rating:** $ratingStr');
-      buffer.writeln('⏰ **Hours:** ${h.openingHours ?? "N/A"}');
-      if (h.phone != null) {
-        buffer.writeln('📞 **Phone:** ${h.phone}');
-      }
-      buffer.writeln('🔬 **Specialties:** ${h.specialties.join(", ")}');
-      buffer.writeln('📝 *${r.scoreExplanation}*');
-      
-      // Verification code for rating/cost submission
-      final verificationCode = HospitalNavigationTool.generateVerificationCode();
-      buffer.writeln('\n✍️ *To submit a rating or actual cost for this hospital, use verification code:* **`$verificationCode`**');
-      buffer.writeln('\n---');
-    }
-
-    if (ranked.length > 3) {
-      buffer.writeln('\nOther nearby facilities include:');
-      for (var i = 3; i < ranked.length; i++) {
-        final r = ranked[i];
-        final h = r.result.hospital;
-        buffer.writeln('- **${h.name}** (${r.result.distanceKm.toStringAsFixed(1)} km away) | Est. Copay: ${r.estimatedCopayRwf} RWF');
-      }
-    }
-
-    return buffer.toString();
-  }
 
   @override
   void dispose() {

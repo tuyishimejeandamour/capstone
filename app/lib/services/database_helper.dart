@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'hospital_navigation_tool.dart';
@@ -150,11 +149,19 @@ class DatabaseHelper {
   Future<String> generateStudentProfileSummary() async {
     final name = await getProfileValue('student_name', defaultValue: 'Student');
     final insurance = await getProfileValue('insurance', defaultValue: 'None');
-    final history = await getProfileValue('history_summary', defaultValue: 'No prior health issues recorded.');
-    final contractSummary = await getProfileValue('insurance_contract_summary', defaultValue: '');
+    final history = await getProfileValue(
+      'history_summary',
+      defaultValue: 'No prior health issues recorded.',
+    );
+    final contractSummary = await getProfileValue(
+      'insurance_contract_summary',
+      defaultValue: '',
+    );
 
     // Get static coverage details
-    final coverageBlock = HospitalNavigationTool.getInsuranceCoverageBlock(insurance);
+    final coverageBlock = HospitalNavigationTool.getInsuranceCoverageBlock(
+      insurance,
+    );
 
     final buffer = StringBuffer();
     buffer.writeln('### [STUDENT PROFILE]');
@@ -164,8 +171,12 @@ class DatabaseHelper {
 
     buffer.writeln('### [INSURANCE COVERAGE — ${coverageBlock.providerName}]');
     buffer.writeln('Network Key: ${coverageBlock.networkKey}');
-    buffer.writeln('Patient Co-pay: ${coverageBlock.copayPercent.toStringAsFixed(0)}%');
-    buffer.writeln('Requires Health Center Referral: ${coverageBlock.requiresReferral ? "YES" : "NO"}');
+    buffer.writeln(
+      'Patient Co-pay: ${coverageBlock.copayPercent.toStringAsFixed(0)}%',
+    );
+    buffer.writeln(
+      'Requires Health Center Referral: ${coverageBlock.requiresReferral ? "YES" : "NO"}',
+    );
     buffer.writeln('Referral Instructions: ${coverageBlock.referralNotes}');
     buffer.writeln('Details: ${coverageBlock.coverageDetails}');
     buffer.writeln();

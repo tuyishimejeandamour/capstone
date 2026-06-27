@@ -12,16 +12,18 @@ import '../widgets/chat_bubble.dart';
 import '../widgets/typing_indicator.dart';
 import '../widgets/holographic_sphere.dart';
 import 'speech_screen.dart';
+import 'hospital_search_screen.dart';
 
-// Color tokens matching the refined app theme
-const _kBgColor = Color(0xFF0E141D);
-const _kSurfaceColor = Color(0xFF17202C);
-const _kElevatedColor = Color(0xFF202B3A);
+// Color tokens matching the refined deep forest green theme
+const _kBgColor = Color(0xFF081510);
+const _kSurfaceColor = Color(0xFF0D1F14);
+const _kElevatedColor = Color(0xFF132A1A);
 const _kAccentColor = Color(0xFF3BE2B0);
 const _kErrorColor = Color(0xFFE56B6B);
-const _kPerfBarColor = Color(0xFF090D13);
-const _kDisabledColor = Color(0xFF1B2533);
+const _kPerfBarColor = Color(0xFF050E08);
+const _kDisabledColor = Color(0xFF0E2016);
 const _kVioletColor = Color(0xFF926BFF);
+const _kBorderColor = Color(0xFF1E3525);
 
 /// Main chat interface for interacting with Gemma 4 E2B on-device.
 class ChatScreen extends StatefulWidget {
@@ -410,6 +412,16 @@ class _ChatScreenState extends State<ChatScreen> {
                         _textController.text = prompt;
                         _sendMessage();
                       },
+                      onFindHospitals: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => HospitalSearchScreen(
+                              studentInsurance: _studentInsurance,
+                            ),
+                          ),
+                        );
+                      },
                     )
                   : SelectionArea(
                       child: ListView.builder(
@@ -602,7 +614,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFF222F3E), width: 1),
+                    borderSide: const BorderSide(color: _kBorderColor, width: 1),
                   ),
                 ),
                 onChanged: (_) {
@@ -627,7 +639,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 decoration: BoxDecoration(
                   color: _kElevatedColor,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF222F3E), width: 1),
+                  border: Border.all(color: _kBorderColor, width: 1),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
@@ -644,16 +656,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         _saveStudentProfile();
                       }
                     },
-                    items: const [
-                      DropdownMenuItem(value: 'None', child: Text('No Insurance / Out-of-pocket')),
-                      DropdownMenuItem(value: 'Mutuelle', child: Text('Mutuelle de Santé (CBHI)')),
-                      DropdownMenuItem(value: 'RSSB', child: Text('RSSB / RAMA')),
-                      DropdownMenuItem(value: 'MMI', child: Text('Military Medical Insurance (MMI)')),
-                      DropdownMenuItem(value: 'Sanlam', child: Text('Sanlam Insurance')),
-                      DropdownMenuItem(value: 'Britam', child: Text('Britam Insurance')),
-                      DropdownMenuItem(value: 'UAP', child: Text('UAP Old Mutual')),
-                      DropdownMenuItem(value: 'Radiant', child: Text('Radiant Insurance')),
-                    ],
+                     items: const [
+                       DropdownMenuItem(value: 'None', child: Text('No Insurance / Out-of-pocket')),
+                       DropdownMenuItem(value: 'Britam', child: Text('Britam Insurance')),
+                       DropdownMenuItem(value: 'UAP', child: Text('Old Mutual / UAP')),
+                     ],
                   ),
                 ),
               ),
@@ -685,7 +692,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFF222F3E), width: 1),
+                    borderSide: const BorderSide(color: _kBorderColor, width: 1),
                   ),
                 ),
                 onChanged: (_) {
@@ -712,7 +719,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   decoration: BoxDecoration(
                     color: _kElevatedColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF222F3E), width: 1),
+                    border: Border.all(color: _kBorderColor, width: 1),
                   ),
                   child: SingleChildScrollView(
                     child: Text(
@@ -929,10 +936,12 @@ class _PerformanceBar extends StatelessWidget {
 class _EmptyState extends StatelessWidget {
   final String studentName;
   final ValueChanged<String> onCardTap;
+  final VoidCallback onFindHospitals;
 
   const _EmptyState({
     required this.studentName,
     required this.onCardTap,
+    required this.onFindHospitals,
   });
 
   @override
@@ -951,26 +960,15 @@ class _EmptyState extends StatelessWidget {
               Container(
                 width: 38,
                 height: 38,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_kVioletColor, _kAccentColor],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF1A3525),
                   shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: _kVioletColor.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      spreadRadius: 1,
-                    ),
-                  ],
                 ),
                 child: Center(
                   child: Text(
                     initials,
                     style: const TextStyle(
-                      color: Colors.black,
+                      color: _kAccentColor,
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
                     ),
@@ -1054,9 +1052,9 @@ class _EmptyState extends StatelessWidget {
               _buildDashboardCard(
                 icon: Icons.health_and_safety_outlined,
                 title: 'In-Network Hospitals',
-                subtitle: 'Find hospitals that accept your insurance plan.',
+                subtitle: 'Find hospitals near you that accept your plan.',
                 color: const Color(0xFFE2B0FF),
-                onTap: () => onCardTap('Which hospital is in-network for my insurance?'),
+                onTap: onFindHospitals,
               ).animate().scale(delay: 450.ms, curve: Curves.easeOutBack),
               _buildDashboardCard(
                 icon: Icons.spa_outlined,
@@ -1210,7 +1208,7 @@ class _InputBar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: _kElevatedColor,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFF222F3E), width: 1.0),
+                border: Border.all(color: _kBorderColor, width: 1.0),
               ),
               child: TextField(
                 controller: controller,

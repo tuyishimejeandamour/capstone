@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
 
-/// Central theme definition for Student Health Guide (Premium Dark Wellness Theme).
+/// Central theme definition for Student Health Guide (Premium Dark Green Wellness Theme).
 ///
-/// This theme implements a calming, high-end "Deep Ocean" color palette.
-/// The deep slate-navy and soothing mint/violet tones are chosen to reduce
-/// late-night anxiety and make students feel safe and comfortable.
+/// This theme implements a calming, high-end "Deep Forest" color palette.
+/// The deep forest-green tones are chosen to reduce late-night anxiety
+/// and make students feel safe and comfortable.
 abstract final class AppTheme {
   // ---------------------------------------------------------------------------
-  // Calming HSL-Curated Color Constants
+  // Deep Forest Green Color Constants
   // ---------------------------------------------------------------------------
 
-  /// Deep slate-navy page background. Feels premium, warm, and highly readable.
-  static const Color background = Color(0xFF0E141D);
+  /// Deep forest-green page background.
+  static const Color background = Color(0xFF081510);
 
   /// Default surface container (cards, drawer background).
-  static const Color surface = Color(0xFF17202C);
+  static const Color surface = Color(0xFF0D1F14);
 
   /// Elevated surfaces (dialogs, input fields, active buttons).
-  static const Color surfaceElevated = Color(0xFF202B3A);
+  static const Color surfaceElevated = Color(0xFF132A1A);
 
   /// Primary calming wellness mint/teal accent. Used for bubbles, tags, indicators.
   static const Color accent = Color(0xFF3BE2B0);
@@ -26,10 +26,10 @@ abstract final class AppTheme {
   static const Color secondaryAccent = Color(0xFF926BFF);
 
   /// AI response chat bubble background (subtle and readable).
-  static const Color bubble = Color(0xFF17202C);
+  static const Color bubble = Color(0xFF0D1F14);
 
-  /// User chat bubble background (Mint/teal gradient target or flat).
-  static const Color userBubble = Color(0xFF202B3A);
+  /// User chat bubble background (solid flat).
+  static const Color userBubble = Color(0xFF132A1A);
 
   /// Positive state.
   static const Color success = Color(0xFF3BE2B0);
@@ -105,8 +105,8 @@ abstract final class AppTheme {
       // ignore: deprecated_member_use
       onBackground: textPrimary,
 
-      outline: Color(0xFF2A3747),
-      outlineVariant: Color(0xFF1B2633),
+      outline: Color(0xFF1E3525),
+      outlineVariant: Color(0xFF142019),
 
       shadow: shadow,
       scrim: Colors.black87,
@@ -145,7 +145,7 @@ abstract final class AppTheme {
         shadowColor: shadow,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(radiusDefault)),
-          side: const BorderSide(color: Color(0xFF222F3E), width: 1),
+          side: const BorderSide(color: Color(0xFF1E3525), width: 1),
         ),
         margin: EdgeInsets.zero,
       ),
@@ -157,7 +157,7 @@ abstract final class AppTheme {
         shadowColor: shadow,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(radiusLarge)),
-          side: const BorderSide(color: Color(0xFF2A3747), width: 1.5),
+          side: const BorderSide(color: Color(0xFF1E3525), width: 1.5),
         ),
         titleTextStyle: const TextStyle(
           color: textPrimary,
@@ -200,11 +200,11 @@ abstract final class AppTheme {
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radiusDefault),
-          borderSide: const BorderSide(color: Color(0xFF222F3E), width: 1),
+          borderSide: const BorderSide(color: Color(0xFF1E3525), width: 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radiusDefault),
-          borderSide: const BorderSide(color: Color(0xFF222F3E), width: 1),
+          borderSide: const BorderSide(color: Color(0xFF1E3525), width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radiusDefault),
@@ -262,7 +262,7 @@ abstract final class AppTheme {
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
-        side: const BorderSide(color: Color(0xFF222F3E), width: 1),
+        side: const BorderSide(color: Color(0xFF1E3525), width: 1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(radiusSmall)),
         ),

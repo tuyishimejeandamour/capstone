@@ -1,3 +1,0 @@
-# Additional deps for ranga_gemma4_e2b_production.ipynb (install in Colab cell)
-# unsloth @ git+https://github.com/unslothai/unsloth.git
-# litert-torch-nightly

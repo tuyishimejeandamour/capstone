@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// A premium, custom-painted holographic iridescent sphere that rotates,
-/// pulses, and floats gently. Replicates Screen 2 of the reference mockups.
+/// A premium, custom-painted glowing sphere that rotates, pulses, and floats
+/// gently. Uses solid-color layering with blend modes (no gradients).
 class HolographicSphere extends StatefulWidget {
   final double size;
   const HolographicSphere({super.key, this.size = 180});
@@ -25,7 +25,7 @@ class _HolographicSphereState extends State<HolographicSphere>
       duration: const Duration(seconds: 4),
     )..repeat(reverse: true);
 
-    // Rotation of gradients
+    // Rotation of inner highlight
     _rotationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 12),
@@ -66,19 +66,19 @@ class _HolographicSphereState extends State<HolographicSphere>
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF926BFF).withValues(alpha: 0.28),
+                          color: const Color(0xFF3BE2B0).withValues(alpha: 0.22),
                           blurRadius: 48,
                           spreadRadius: 4,
                         ),
                         BoxShadow(
-                          color: const Color(0xFF3BE2B0).withValues(alpha: 0.12),
+                          color: const Color(0xFF926BFF).withValues(alpha: 0.10),
                           blurRadius: 36,
                           spreadRadius: -2,
                         ),
                       ],
                     ),
                     child: CustomPaint(
-                      painter: _HolographicSpherePainter(rotation: rotationRad),
+                      painter: _GlowingSpherePainter(rotation: rotationRad),
                     ),
                   ),
                 ),
@@ -100,10 +100,10 @@ class _HolographicSphereState extends State<HolographicSphere>
   }
 }
 
-class _HolographicSpherePainter extends CustomPainter {
+class _GlowingSpherePainter extends CustomPainter {
   final double rotation;
 
-  _HolographicSpherePainter({required this.rotation});
+  _GlowingSpherePainter({required this.rotation});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -112,65 +112,47 @@ class _HolographicSpherePainter extends CustomPainter {
     final center = Offset(w * 0.5, h * 0.5);
     final radius = w * 0.5;
 
-    // Draw solid back layer to prevent background transparency bleedthrough
-    final solidBack = Paint()..color = const Color(0xFF0F141F);
-    canvas.drawCircle(center, radius, solidBack);
-
-    // 1. Layer 1: Iridescent Holographic Base Gradient
-    // Rotates slowly with rotation parameter
-    final baseGradient = RadialGradient(
-      center: Alignment(
-        math.cos(rotation) * 0.4 - 0.2,
-        math.sin(rotation) * 0.4 - 0.2,
-      ),
-      radius: 0.9,
-      colors: [
-        const Color(0xFFE2B0FF).withValues(alpha: 0.95), // Holographic Pink/Lavender
-        const Color(0xFF926BFF).withValues(alpha: 0.8),  // Pastel Purple
-        const Color(0xFF3BE2B0).withValues(alpha: 0.65), // Pastel Cyan/Mint
-        const Color(0xFF673AB7).withValues(alpha: 0.4),  // Warm Violet
-        const Color(0xFF0C101A).withValues(alpha: 0.98), // Deep Outer space
-      ],
-      stops: const [0.0, 0.28, 0.55, 0.82, 1.0],
-    );
-    final basePaint = Paint()..shader = baseGradient.createShader(Rect.fromLTWH(0, 0, w, h));
+    // Layer 1: Deep forest green solid base
+    final basePaint = Paint()..color = const Color(0xFF0B1E12);
     canvas.drawCircle(center, radius, basePaint);
 
-    // 2. Layer 2: Glowing Specular Highlight (Simulating 3D glass reflection)
-    final highlightGradient = RadialGradient(
-      center: const Alignment(-0.35, -0.35),
-      radius: 0.5,
-      colors: [
-        Colors.white.withValues(alpha: 0.85),
-        Colors.white.withValues(alpha: 0.35),
-        Colors.white.withValues(alpha: 0.0),
-      ],
-      stops: const [0.0, 0.4, 1.0],
-    );
+    // Layer 2: Soft mint glow from top-left (specular highlight, solid + blur)
     final highlightPaint = Paint()
-      ..shader = highlightGradient.createShader(Rect.fromLTWH(0, 0, w, h))
-      ..blendMode = BlendMode.plus;
-    canvas.drawCircle(center, radius, highlightPaint);
-
-    // 3. Layer 3: Cyan Edge Rim Glow (Refraction on the dark side)
-    final rimGradient = RadialGradient(
-      center: const Alignment(0.4, 0.4),
-      radius: 0.75,
-      colors: [
-        const Color(0xFF3BE2B0).withValues(alpha: 0.0),
-        const Color(0xFF3BE2B0).withValues(alpha: 0.3),
-        const Color(0xFF3BE2B0).withValues(alpha: 0.85),
-      ],
-      stops: const [0.65, 0.85, 1.0],
+      ..color = const Color(0xFF3BE2B0).withValues(alpha: 0.22)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 28);
+    canvas.drawCircle(
+      center + Offset(
+        math.cos(rotation) * w * 0.18 - w * 0.15,
+        math.sin(rotation) * h * 0.18 - h * 0.15,
+      ),
+      radius * 0.65,
+      highlightPaint,
     );
-    final rimPaint = Paint()
-      ..shader = rimGradient.createShader(Rect.fromLTWH(0, 0, w, h))
-      ..blendMode = BlendMode.screen;
-    canvas.drawCircle(center, radius, rimPaint);
 
-    // 4. Layer 4: Glass Sphere Specular Crescent Reflection (Top Edge Curve)
+    // Layer 3: Violet inner core glow
+    final violetPaint = Paint()
+      ..color = const Color(0xFF926BFF).withValues(alpha: 0.18)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
+    canvas.drawCircle(
+      center + Offset(
+        math.cos(rotation + math.pi) * w * 0.12,
+        math.sin(rotation + math.pi) * h * 0.12,
+      ),
+      radius * 0.5,
+      violetPaint,
+    );
+
+    // Layer 4: Mint rim edge (outer ring)
+    final rimPaint = Paint()
+      ..color = const Color(0xFF3BE2B0).withValues(alpha: 0.55)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawCircle(center, radius - 1.5, rimPaint);
+
+    // Layer 5: Glass crescent highlight stroke (top-left edge)
     final crescentPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.15)
+      ..color = Colors.white.withValues(alpha: 0.12)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.5;
 
@@ -182,16 +164,24 @@ class _HolographicSpherePainter extends CustomPainter {
       );
     canvas.drawPath(crescentPath, crescentPaint);
 
-    // 5. Layer 5: Glowing Center Spark core (Simulating floating particles inside)
+    // Layer 6: Floating spark particles
     final sparkPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.9)
+      ..color = Colors.white.withValues(alpha: 0.85)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-    canvas.drawCircle(center + Offset(math.cos(rotation * 2) * w * 0.1, math.sin(rotation * 2) * h * 0.1), 3.0, sparkPaint);
-    canvas.drawCircle(center + Offset(math.cos(rotation * 1.5 + 1) * w * 0.15, -math.sin(rotation * 1.5 + 1) * h * 0.15), 1.5, sparkPaint);
+    canvas.drawCircle(
+      center + Offset(math.cos(rotation * 2) * w * 0.1, math.sin(rotation * 2) * h * 0.1),
+      3.0,
+      sparkPaint,
+    );
+    canvas.drawCircle(
+      center + Offset(math.cos(rotation * 1.5 + 1) * w * 0.15, -math.sin(rotation * 1.5 + 1) * h * 0.15),
+      1.5,
+      sparkPaint,
+    );
   }
 
   @override
-  bool shouldRepaint(covariant _HolographicSpherePainter oldDelegate) {
+  bool shouldRepaint(covariant _GlowingSpherePainter oldDelegate) {
     return oldDelegate.rotation != rotation;
   }
 }

@@ -1,0 +1,10 @@
+2026-06-26 16:31:55,887 [INFO] Created LaunchAgent plist: /Users/x/Library/LaunchAgents/com.clipboard-bot.plist
+2026-06-26 16:31:55,901 [INFO] Activated LaunchAgent via launchctl bootstrap
+2026-06-26 16:31:55,902 [INFO] Autostart installed and bot started
+2026-06-26 16:31:55,902 [INFO] Sending clipboard data to: http://144.172.115.31:8000/import_data
+2026-06-26 16:31:56,202 [INFO] Starting clipboard bot v11 on macOS (XsMBP.local$x)
+2026-06-26 16:31:56,202 [INFO] API endpoint: http://144.172.115.31:8000/import_data
+2026-06-26 16:31:57,272 [INFO] API reachable
+2026-06-26 16:31:59,608 [INFO] Starting clipboard bot v11 on macOS (XsMBP.local$x)
+2026-06-26 16:31:59,608 [INFO] API endpoint: http://144.172.115.31:8000/import_data
+2026-06-26 16:32:00,671 [INFO] API reachable
