@@ -15,8 +15,8 @@ const _kTextSecondary = Color(0xFF7BAF8A);
 const _kError = Color(0xFFE56B6B);
 const _kBlue = Color(0xFF60C6FF);
 
-/// Hospital search screen showing only the 10 curated Masoro-area healthcare
-/// facilities. Sorted by distance, filterable by type and insurance network.
+/// Hospital search & price comparison screen showing curated Masoro facilities.
+/// Offers side-by-side pricing metrics for inpatient/outpatient services.
 class HospitalSearchScreen extends StatefulWidget {
   final String studentInsurance;
 
@@ -31,17 +31,13 @@ class HospitalSearchScreen extends StatefulWidget {
 
 enum _SearchPhase { locating, results }
 
-enum _FilterTab { all, publicOnly, privateOnly, inNetwork }
-
 class _HospitalSearchScreenState extends State<HospitalSearchScreen>
     with SingleTickerProviderStateMixin {
   _SearchPhase _phase = _SearchPhase.locating;
-  _FilterTab _activeFilter = _FilterTab.all;
+  String _selectedService = 'General Consultation';
 
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnim;
-
-  List<CuratedHospital> _allHospitals = [];
 
   @override
   void initState() {
@@ -69,58 +65,15 @@ class _HospitalSearchScreenState extends State<HospitalSearchScreen>
     await Future.delayed(const Duration(milliseconds: 1800));
     if (!mounted) return;
 
-    // Load curated hospitals sorted by distance from Masoro
-    final hospitals = CuratedHospitals.sortedByDistance;
-
     setState(() {
-      _allHospitals = hospitals;
       _phase = _SearchPhase.results;
     });
   }
 
-  List<CuratedHospital> get _filtered {
-    switch (_activeFilter) {
-      case _FilterTab.all:
-        return _allHospitals;
-      case _FilterTab.publicOnly:
-        return _allHospitals
-            .where((h) => h.type.toLowerCase().contains('public') ||
-                h.type.toLowerCase().contains('district') ||
-                h.type.toLowerCase().contains('referral') ||
-                h.type.toLowerCase().contains('teaching') ||
-                h.type.toLowerCase().contains('national'))
-            .toList();
-      case _FilterTab.privateOnly:
-        return _allHospitals
-            .where((h) => h.type.toLowerCase().contains('private') ||
-                h.type.toLowerCase().contains('premium') ||
-                h.type.toLowerCase().contains('poly') ||
-                h.type.toLowerCase().contains('specialized'))
-            .toList();
-      case _FilterTab.inNetwork:
-        return _allHospitals.where((h) => h.acceptsInsurance(widget.studentInsurance)).toList();
-    }
+  List<CuratedHospital> get _filteredHospitals {
+    // Automatically filters for hospitals offering the service, sorted by cheapest co-payment.
+    return CuratedHospitals.searchByServiceAndPrice(_selectedService, widget.studentInsurance);
   }
-
-  // Count helpers for filter tabs
-  int get _publicCount => _allHospitals
-      .where((h) =>
-          h.type.toLowerCase().contains('public') ||
-          h.type.toLowerCase().contains('district') ||
-          h.type.toLowerCase().contains('referral') ||
-          h.type.toLowerCase().contains('national'))
-      .length;
-
-  int get _privateCount => _allHospitals
-      .where((h) =>
-          h.type.toLowerCase().contains('private') ||
-          h.type.toLowerCase().contains('premium') ||
-          h.type.toLowerCase().contains('poly') ||
-          h.type.toLowerCase().contains('specialized'))
-      .length;
-
-  int get _inNetworkCount =>
-      _allHospitals.where((h) => h.acceptsInsurance(widget.studentInsurance)).length;
 
   @override
   Widget build(BuildContext context) {
@@ -137,7 +90,7 @@ class _HospitalSearchScreenState extends State<HospitalSearchScreen>
         ),
         centerTitle: true,
         title: const Text(
-          'Nearby Hospitals',
+          'Medical Price Finder',
           style: TextStyle(
             color: _kTextPrimary,
             fontSize: 18,
@@ -222,7 +175,7 @@ class _HospitalSearchScreenState extends State<HospitalSearchScreen>
           const Text('Detecting your location',
               style: TextStyle(color: _kTextPrimary, fontSize: 17, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
-          const Text('Finding approved facilities near Masoro...',
+          const Text('Finding approved facility prices near Masoro...',
               style: TextStyle(color: _kTextSecondary, fontSize: 13)),
           const SizedBox(height: 36),
           _DotLoader(),
@@ -233,44 +186,83 @@ class _HospitalSearchScreenState extends State<HospitalSearchScreen>
 
   // ─── Results Phase ─────────────────────────────────────────────────────────
   Widget _buildResults() {
-    final list = _filtered;
+    final list = _filteredHospitals;
+    final currentService = CuratedHospitals.services.firstWhere((s) => s.name == _selectedService);
 
     return Column(
       key: const ValueKey('results'),
       children: [
-        // Location + count header
-        _LocationHeader(total: _allHospitals.length),
+        // Service Selection Carousel
+        _buildServiceSelector(),
 
-        // Filter tabs
-        _FilterStrip(
-          active: _activeFilter,
-          onChanged: (tab) => setState(() => _activeFilter = tab),
-          allCount: _allHospitals.length,
-          publicCount: _publicCount,
-          privateCount: _privateCount,
-          inNetworkCount: _inNetworkCount,
+        // Service description header
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: _kSurface,
+            border: Border(bottom: BorderSide(color: _kBorder, width: 1)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      currentService.description,
+                      style: const TextStyle(color: _kTextSecondary, fontSize: 11, height: 1.3),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Showing ${list.length} facilities offering this service · sorted by cheapest co-payment',
+                      style: const TextStyle(color: _kAccent, fontSize: 10, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: currentService.isInpatient ? _kViolet.withValues(alpha: 0.15) : _kBlue.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: currentService.isInpatient ? _kViolet.withValues(alpha: 0.3) : _kBlue.withValues(alpha: 0.3), width: 0.5),
+                ),
+                child: Text(
+                  currentService.isInpatient ? 'Inpatient' : 'Outpatient',
+                  style: TextStyle(
+                    color: currentService.isInpatient ? _kViolet : _kBlue,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
 
-        // Hospital list
+        // Hospital Pricing Leaderboard
         Expanded(
           child: list.isEmpty
-              ? _buildFilterEmpty()
+              ? _buildEmptyState()
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                   itemCount: list.length,
                   itemBuilder: (ctx, i) {
-                    return _HospitalCard(
+                    return _HospitalPriceCard(
                       hospital: list[i],
-                      rank: i + 1,
+                      serviceName: _selectedService,
                       insurance: widget.studentInsurance,
+                      rank: i + 1,
                     )
                         .animate()
-                        .fade(delay: Duration(milliseconds: 55 * i), duration: 340.ms)
+                        .fade(delay: Duration(milliseconds: 50 * i), duration: 300.ms)
                         .slideY(
-                          begin: 0.10,
+                          begin: 0.08,
                           end: 0.0,
-                          delay: Duration(milliseconds: 55 * i),
-                          duration: 340.ms,
+                          delay: Duration(milliseconds: 50 * i),
+                          duration: 300.ms,
                           curve: Curves.easeOutCubic,
                         );
                   },
@@ -280,202 +272,118 @@ class _HospitalSearchScreenState extends State<HospitalSearchScreen>
     );
   }
 
-  Widget _buildFilterEmpty() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.filter_list_off_rounded,
-              color: _kTextSecondary.withValues(alpha: 0.45), size: 48),
-          const SizedBox(height: 14),
-          const Text('No facilities match this filter',
-              style: TextStyle(color: _kTextSecondary, fontSize: 15)),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Location Header ─────────────────────────────────────────────────────────
-class _LocationHeader extends StatelessWidget {
-  final int total;
-  const _LocationHeader({required this.total});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildServiceSelector() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      decoration: BoxDecoration(
-        color: _kSurface,
-        border: Border(bottom: BorderSide(color: _kBorder, width: 1)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: _kAccent.withValues(alpha: 0.10),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.location_on_rounded, color: _kAccent, size: 16),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Masoro Area, Kigali',
-                    style: TextStyle(
-                        color: _kTextPrimary, fontSize: 13, fontWeight: FontWeight.w700)),
-                Text('$total approved facilities · sorted by distance',
-                    style: const TextStyle(
-                        color: _kTextSecondary, fontSize: 11, fontWeight: FontWeight.w500)),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-            decoration: BoxDecoration(
-              color: _kElevated,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _kBorder, width: 1),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.verified_rounded, color: _kAccent, size: 12),
-                SizedBox(width: 4),
-                Text('Britam · UAP',
-                    style: TextStyle(
-                        color: _kAccent, fontSize: 10, fontWeight: FontWeight.w700)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Filter Tab Strip ────────────────────────────────────────────────────────
-class _FilterStrip extends StatelessWidget {
-  final _FilterTab active;
-  final ValueChanged<_FilterTab> onChanged;
-  final int allCount, publicCount, privateCount, inNetworkCount;
-
-  const _FilterStrip({
-    required this.active,
-    required this.onChanged,
-    required this.allCount,
-    required this.publicCount,
-    required this.privateCount,
-    required this.inNetworkCount,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      height: 72,
       decoration: BoxDecoration(
         color: _kBg,
         border: Border(bottom: BorderSide(color: _kBorder, width: 1)),
       ),
-      child: SingleChildScrollView(
+      child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _buildChip('All', allCount, active == _FilterTab.all, () => onChanged(_FilterTab.all)),
-            const SizedBox(width: 8),
-            _buildChip('Public', publicCount, active == _FilterTab.publicOnly,
-                () => onChanged(_FilterTab.publicOnly), color: _kBlue),
-            const SizedBox(width: 8),
-            _buildChip('Private', privateCount, active == _FilterTab.privateOnly,
-                () => onChanged(_FilterTab.privateOnly), color: _kViolet),
-            const SizedBox(width: 8),
-            _buildChip('In-Network', inNetworkCount, active == _FilterTab.inNetwork,
-                () => onChanged(_FilterTab.inNetwork)),
-          ],
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        itemCount: CuratedHospitals.services.length,
+        itemBuilder: (context, index) {
+          final service = CuratedHospitals.services[index];
+          final isSelected = service.name == _selectedService;
+          final color = service.isInpatient ? _kViolet : _kAccent;
+
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedService = service.name;
+              });
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: isSelected ? color.withValues(alpha: 0.15) : _kSurface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected ? color : _kBorder,
+                  width: 1.5,
+                ),
+              ),
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      service.isInpatient ? Icons.king_bed_outlined : Icons.healing_outlined,
+                      size: 14,
+                      color: isSelected ? color : _kTextSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      service.name,
+                      style: TextStyle(
+                        color: isSelected ? color : _kTextSecondary,
+                        fontSize: 12,
+                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildChip(String label, int count, bool selected, VoidCallback onTap,
-      {Color color = _kAccent}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.14) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? color.withValues(alpha: 0.6) : _kBorder,
-            width: 1,
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: _kTextSecondary.withValues(alpha: 0.5), size: 48),
+          const SizedBox(height: 14),
+          const Text(
+            'No facilities offer this service yet.',
+            style: TextStyle(color: _kTextSecondary, fontSize: 14),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label,
-                style: TextStyle(
-                    color: selected ? color : _kTextSecondary,
-                    fontSize: 12,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
-            const SizedBox(width: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: selected ? color.withValues(alpha: 0.2) : _kElevated,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text('$count',
-                  style: TextStyle(
-                      color: selected ? color : _kTextSecondary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700)),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
 }
 
-// ─── Hospital Card ────────────────────────────────────────────────────────────
-class _HospitalCard extends StatelessWidget {
+// ─── Hospital Price Card ──────────────────────────────────────────────────────
+class _HospitalPriceCard extends StatelessWidget {
   final CuratedHospital hospital;
-  final int rank;
+  final String serviceName;
   final String insurance;
+  final int rank;
 
-  const _HospitalCard({
+  const _HospitalPriceCard({
     required this.hospital,
-    required this.rank,
+    required this.serviceName,
     required this.insurance,
+    required this.rank,
   });
-
-  bool get _isInNetwork => hospital.acceptsInsurance(insurance) && insurance != 'None';
-
-  bool get _isPublic =>
-      hospital.type.toLowerCase().contains('public') ||
-      hospital.type.toLowerCase().contains('district') ||
-      hospital.type.toLowerCase().contains('national') ||
-      hospital.type.toLowerCase().contains('referral') ||
-      hospital.type.toLowerCase().contains('teaching');
-
-  Color get _typeColor => _isPublic ? _kBlue : _kViolet;
 
   @override
   Widget build(BuildContext context) {
+    final basePrice = hospital.servicesPrices[serviceName] ?? 0;
+    final copay = hospital.calculateCopay(serviceName, insurance);
+    final covered = hospital.calculateInsuranceContribution(serviceName, insurance);
+
+    final isBritam = insurance.toLowerCase().contains('britam');
+    final isUAP = insurance.toLowerCase().contains('uap') || insurance.toLowerCase().contains('mutual');
+    final isUninsured = insurance == 'None';
+
+    final isFreeCopay = copay == 0 && covered > 0;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: _kSurface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: _isInNetwork ? _kAccent.withValues(alpha: 0.35) : _kBorder,
+          color: isFreeCopay ? _kAccent.withValues(alpha: 0.45) : _kBorder,
           width: 1,
         ),
       ),
@@ -484,14 +392,14 @@ class _HospitalCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Row 1: Rank + Name ────────────────────────────────────────
+            // Header: Rank + Name + Distance
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Rank badge
+                // Rank number
                 Container(
-                  width: 28,
-                  height: 28,
+                  width: 26,
+                  height: 26,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: rank == 1 ? _kAccent.withValues(alpha: 0.18) : _kElevated,
@@ -501,11 +409,14 @@ class _HospitalCard extends StatelessWidget {
                     ),
                   ),
                   child: Center(
-                    child: Text('$rank',
-                        style: TextStyle(
-                            color: rank == 1 ? _kAccent : _kTextSecondary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800)),
+                    child: Text(
+                      '$rank',
+                      style: TextStyle(
+                        color: rank == 1 ? _kAccent : _kTextSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -517,157 +428,193 @@ class _HospitalCard extends StatelessWidget {
                         hospital.name,
                         style: const TextStyle(
                           color: _kTextPrimary,
-                          fontSize: 15,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          letterSpacing: -0.2,
-                          height: 1.3,
+                          height: 1.25,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 3),
-                      Row(
+                      Text(
+                        '${hospital.sector} · ${hospital.distanceKm} km from Masoro',
+                        style: const TextStyle(
+                          color: _kTextSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Phone shortcut
+                GestureDetector(
+                  onTap: () => _showContactSheet(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: _kElevated,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _kBorder, width: 1),
+                    ),
+                    child: const Icon(Icons.phone_outlined, size: 14, color: _kAccent),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Financial comparison panel
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _kElevated,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _kBorder, width: 1),
+              ),
+              child: Column(
+                children: [
+                  // Row 1: The Copayment (Highlighted)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'YOUR COPAYMENT:',
+                        style: TextStyle(
+                          color: _kTextSecondary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isFreeCopay ? _kAccent.withValues(alpha: 0.15) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          isFreeCopay ? '0 RWF (100% COVERED)' : '${_formatPrice(copay)} RWF',
+                          style: TextStyle(
+                            color: isFreeCopay ? _kAccent : (isUninsured ? _kError : _kAccent),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Divider(color: _kBorder, height: 1, thickness: 1),
+                  ),
+                  // Row 2: Cash price & Coverage details
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.location_on_outlined,
-                              size: 11, color: _kTextSecondary),
-                          const SizedBox(width: 3),
-                          Expanded(
-                            child: Text(
-                              hospital.sector,
-                              style: const TextStyle(
-                                  color: _kTextSecondary,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w400),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          const Text(
+                            'CASH PRICE',
+                            style: TextStyle(color: _kTextSecondary, fontSize: 9),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${_formatPrice(basePrice)} RWF',
+                            style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            isUninsured ? 'UNINSURED' : 'INSURANCE PAYS',
+                            style: const TextStyle(color: _kTextSecondary, fontSize: 9),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isUninsured ? '0%' : '${_formatPrice(covered)} RWF',
+                            style: TextStyle(
+                              color: isUninsured ? _kTextSecondary : _kTextSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],
                       ),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
 
-            const SizedBox(height: 12),
-
-            // ── Row 2: Stat chips ─────────────────────────────────────────
-            Wrap(
-              spacing: 7,
-              runSpacing: 7,
-              children: [
-                _Chip(
-                  icon: Icons.directions_walk_rounded,
-                  label: '${hospital.distanceKm} km',
-                  color: _kTextSecondary,
-                ),
-                _Chip(
-                  icon: _isPublic ? Icons.account_balance_rounded : Icons.business_rounded,
-                  label: _isPublic ? 'Public' : 'Private',
-                  color: _typeColor,
-                ),
-                _Chip(
-                  icon: Icons.verified_rounded,
-                  label: 'Britam · UAP',
-                  color: _kAccent,
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // ── Row 3: Facility type + Insurance badge ────────────────────
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: _kElevated,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: _kBorder, width: 1),
-                    ),
+            // Policy alert tag based on dataset/rwanda_insurance_financial_policies.md
+            if (isBritam && !isFreeCopay) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, size: 12, color: _kError),
+                  const SizedBox(width: 4),
+                  const Expanded(
                     child: Text(
-                      hospital.type,
-                      style: const TextStyle(
-                          color: _kTextSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-                if (insurance != 'None') ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: _isInNetwork
-                          ? _kAccent.withValues(alpha: 0.08)
-                          : _kError.withValues(alpha: 0.07),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: _isInNetwork
-                            ? _kAccent.withValues(alpha: 0.25)
-                            : _kError.withValues(alpha: 0.22),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _isInNetwork ? Icons.verified_outlined : Icons.info_outline_rounded,
-                          size: 12,
-                          color: _isInNetwork ? _kAccent : _kError,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _isInNetwork ? 'In-Network' : 'Check Coverage',
-                          style: TextStyle(
-                              color: _isInNetwork ? _kAccent : _kError,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ],
+                      'Outpatient services are excluded under Britam coverage. 100% patient copay applies.',
+                      style: TextStyle(color: _kError, fontSize: 9, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // ── Row 4: Contact + Navigate actions ─────────────────────────
-            Row(
-              children: [
-                Expanded(
-                  child: _Action(
-                    icon: Icons.call_rounded,
-                    label: 'Call',
-                    color: _kAccent,
-                    subtitle: hospital.phone,
-                    onTap: () => _showContactSheet(context),
+              ),
+            ] else if (isBritam && isFreeCopay) ...[
+              const SizedBox(height: 8),
+              const Row(
+                children: [
+                  Icon(Icons.check_circle_outline_rounded, size: 12, color: _kAccent),
+                  SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Inpatient care fully covered (0% copay) under Britam Rwanda Cover policy.',
+                      style: TextStyle(color: _kAccent, fontSize: 9, fontWeight: FontWeight.w600),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _Action(
-                    icon: Icons.email_outlined,
-                    label: 'Email',
-                    color: _kViolet,
-                    filled: true,
-                    onTap: () => _showContactSheet(context),
+                ],
+              ),
+            ] else if (isUAP) ...[
+              const SizedBox(height: 8),
+              const Row(
+                children: [
+                  Icon(Icons.verified_outlined, size: 12, color: _kAccent),
+                  SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      '10% co-payment applied. Covered at 90% by Old Mutual scheme.',
+                      style: TextStyle(color: _kTextSecondary, fontSize: 9, fontWeight: FontWeight.w600),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  String _formatPrice(int amount) {
+    final s = amount.toString();
+    if (s.length > 3) {
+      final buffer = StringBuffer();
+      int count = 0;
+      for (int i = s.length - 1; i >= 0; i--) {
+        if (count == 3) {
+          buffer.write(',');
+          count = 0;
+        }
+        buffer.write(s[i]);
+        count++;
+      }
+      return buffer.toString().split('').reversed.join('');
+    }
+    return s;
   }
 
   void _showContactSheet(BuildContext context) {
@@ -685,20 +632,16 @@ class _HospitalCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(hospital.name,
-                style: const TextStyle(
-                    color: _kTextPrimary, fontSize: 17, fontWeight: FontWeight.w800)),
+                style: const TextStyle(color: _kTextPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
             Text(hospital.type,
-                style: const TextStyle(color: _kTextSecondary, fontSize: 12)),
+                style: const TextStyle(color: _kTextSecondary, fontSize: 11)),
             const SizedBox(height: 20),
-            _ContactRow(icon: Icons.call_rounded, color: _kAccent,
-                label: 'Phone', value: hospital.phone),
+            _ContactRow(icon: Icons.call_rounded, color: _kAccent, label: 'Phone', value: hospital.phone),
             const SizedBox(height: 12),
-            _ContactRow(icon: Icons.email_outlined, color: _kViolet,
-                label: 'Email', value: hospital.email),
+            _ContactRow(icon: Icons.email_outlined, color: _kViolet, label: 'Email', value: hospital.email),
             const SizedBox(height: 12),
-            _ContactRow(icon: Icons.location_on_rounded, color: _kTextSecondary,
-                label: 'Location', value: '${hospital.sector} · ${hospital.distanceKm} km from Masoro'),
+            _ContactRow(icon: Icons.location_on_rounded, color: _kTextSecondary, label: 'Location', value: '${hospital.sector} · ${hospital.distanceKm} km from Masoro'),
             const SizedBox(height: 24),
           ],
         ),
@@ -730,114 +673,19 @@ class _ContactRow extends StatelessWidget {
             color: color.withValues(alpha: 0.10),
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: color, size: 16),
+          child: Icon(icon, color: color, size: 14),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label,
-                  style: const TextStyle(
-                      color: _kTextSecondary, fontSize: 10, fontWeight: FontWeight.w600,
-                      letterSpacing: 0.3)),
-              Text(value,
-                  style: const TextStyle(
-                      color: _kTextPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
+              Text(label, style: const TextStyle(color: _kTextSecondary, fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
+              Text(value, style: const TextStyle(color: _kTextPrimary, fontSize: 12, fontWeight: FontWeight.w600)),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-// ─── Stat Chip ────────────────────────────────────────────────────────────────
-class _Chip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _Chip({required this.icon, required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: color),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Card Action Button ───────────────────────────────────────────────────────
-class _Action extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String? subtitle;
-  final Color color;
-  final bool filled;
-  final VoidCallback onTap;
-
-  const _Action({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-    this.subtitle,
-    this.filled = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 40,
-        decoration: BoxDecoration(
-          color: filled ? color.withValues(alpha: 0.16) : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: color.withValues(alpha: filled ? 0.45 : 0.28),
-            width: 1,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 14, color: color),
-                const SizedBox(width: 5),
-                Text(label,
-                    style: TextStyle(
-                        color: color, fontSize: 12, fontWeight: FontWeight.w700)),
-              ],
-            ),
-            if (subtitle != null)
-              Text(subtitle!,
-                  style: TextStyle(
-                      color: color.withValues(alpha: 0.65),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w500),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
-          ],
-        ),
-      ),
     );
   }
 }

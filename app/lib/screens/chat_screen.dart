@@ -1006,9 +1006,6 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = studentName.isNotEmpty
-        ? studentName[0].toUpperCase()
-        : 'S';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),

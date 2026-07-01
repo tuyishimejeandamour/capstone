@@ -4,6 +4,18 @@
 /// This list is authoritative — the AI will ONLY recommend facilities from here.
 library;
 
+class MedicalService {
+  final String name;
+  final bool isInpatient;
+  final String description;
+
+  const MedicalService({
+    required this.name,
+    required this.isInpatient,
+    required this.description,
+  });
+}
+
 class CuratedHospital {
   final String name;
   final String type;
@@ -13,6 +25,9 @@ class CuratedHospital {
   final String email;
   final bool worksBritam;
   final bool worksUAP;
+
+  /// Map of medical service names to their base cash price (uninsured rate) in RWF.
+  final Map<String, int> servicesPrices;
 
   /// Approximate coordinates for Masoro-area positioning.
   /// Used for distance sorting when GPS is available.
@@ -28,6 +43,7 @@ class CuratedHospital {
     required this.email,
     required this.worksBritam,
     required this.worksUAP,
+    required this.servicesPrices,
     required this.lat,
     required this.lng,
   });
@@ -40,14 +56,92 @@ class CuratedHospital {
     final ins = insurance.toLowerCase();
     if (ins.contains('britam')) return worksBritam;
     if (ins.contains('uap') || ins.contains('mutual')) return worksUAP;
-    // All facilities in this list accept both major plans
     return worksBritam || worksUAP;
+  }
+
+  /// Calculates the patient's out-of-pocket co-payment for a service.
+  /// Sourced from dataset/rwanda_insurance_financial_policies.md.
+  int calculateCopay(String serviceName, String insurance) {
+    final price = servicesPrices[serviceName];
+    if (price == null) return 0; // Service not offered
+
+    final ins = insurance.toLowerCase();
+    final service = CuratedHospitals.services.firstWhere(
+      (s) => s.name == serviceName,
+      orElse: () => const MedicalService(name: '', isInpatient: false, description: ''),
+    );
+
+    if (ins.contains('britam')) {
+      // Britam: Inpatient overall is 0% co-pay (fully covered). Outpatient is fully excluded (100% copay).
+      if (service.isInpatient) {
+        return 0; // 0% Co-payment
+      } else {
+        return price; // Outpatient is excluded (100% copay)
+      }
+    } else if (ins.contains('uap') || ins.contains('mutual')) {
+      // Old Mutual / UAP: 10% co-payment (90% covered) for all inpatient and outpatient services.
+      return (price * 0.10).round();
+    } else {
+      // No Insurance / Out-of-pocket: 100% co-payment
+      return price;
+    }
+  }
+
+  /// Calculates the amount covered/paid by the insurance provider for a service.
+  int calculateInsuranceContribution(String serviceName, String insurance) {
+    final price = servicesPrices[serviceName];
+    if (price == null) return 0;
+    return price - calculateCopay(serviceName, insurance);
   }
 }
 
 /// Curated list of 10 recommended healthcare facilities near Masoro, Kigali.
 /// All facilities accept both Britam and UAP (Old Mutual) insurance.
 class CuratedHospitals {
+  /// Authoritative list of standard services for comparison.
+  static const List<MedicalService> services = [
+    MedicalService(
+      name: 'General Consultation',
+      isInpatient: false,
+      description: 'Standard Outpatient Consultation with a General Practitioner (GP).',
+    ),
+    MedicalService(
+      name: 'Specialist Consultation',
+      isInpatient: false,
+      description: 'Consultation with a specialist (Dentist, Gynecologist, Psychiatrist, etc.).',
+    ),
+    MedicalService(
+      name: 'Full Blood Count',
+      isInpatient: false,
+      description: 'Basic laboratory blood panel diagnostic test.',
+    ),
+    MedicalService(
+      name: 'Dental Cleaning / Filling',
+      isInpatient: false,
+      description: 'Standard outpatient dental check, scaling, cleaning or cavity filling.',
+    ),
+    MedicalService(
+      name: 'Abdominal/Obstetric Ultrasound',
+      isInpatient: false,
+      description: 'Imaging scan for pregnancy or abdominal organ evaluation.',
+    ),
+    MedicalService(
+      name: 'Chest X-Ray',
+      isInpatient: false,
+      description: 'Diagnostic chest imaging for respiratory or cardiac symptoms.',
+    ),
+    MedicalService(
+      name: 'Inpatient Admission',
+      isInpatient: true,
+      description: 'Inpatient room and board ward rate per day.',
+    ),
+    MedicalService(
+      name: 'Standard Maternity Delivery',
+      isInpatient: true,
+      description: 'Normal delivery inpatient hospital care and obstetric support.',
+    ),
+  ];
+
   static const List<CuratedHospital> all = [
     CuratedHospital(
       name: 'Nora Dental Clinic',
@@ -58,6 +152,10 @@ class CuratedHospitals {
       email: 'info@auca.ac.rw',
       worksBritam: true,
       worksUAP: true,
+      servicesPrices: {
+        'Specialist Consultation': 15000,
+        'Dental Cleaning / Filling': 30000,
+      },
       lat: -1.9197,
       lng: 30.1423,
     ),
@@ -70,6 +168,11 @@ class CuratedHospitals {
       email: 'ndera.hospital@moh.gov.rw',
       worksBritam: true,
       worksUAP: true,
+      servicesPrices: {
+        'General Consultation': 5000,
+        'Specialist Consultation': 12000,
+        'Inpatient Admission': 20000,
+      },
       lat: -1.9215,
       lng: 30.1440,
     ),
@@ -82,6 +185,13 @@ class CuratedHospitals {
       email: 'info@legacyclinics.rw',
       worksBritam: true,
       worksUAP: true,
+      servicesPrices: {
+        'General Consultation': 18000,
+        'Specialist Consultation': 28000,
+        'Full Blood Count': 12000,
+        'Abdominal/Obstetric Ultrasound': 30000,
+        'Chest X-Ray': 22000,
+      },
       lat: -1.9600,
       lng: 30.1100,
     ),
@@ -94,6 +204,11 @@ class CuratedHospitals {
       email: 'bellavitaeclinic@gmail.com',
       worksBritam: true,
       worksUAP: true,
+      servicesPrices: {
+        'General Consultation': 10000,
+        'Full Blood Count': 8000,
+        'Abdominal/Obstetric Ultrasound': 20000,
+      },
       lat: -1.9610,
       lng: 30.1090,
     ),
@@ -106,6 +221,14 @@ class CuratedHospitals {
       email: 'info@rwandamilitaryhospital.rw',
       worksBritam: true,
       worksUAP: true,
+      servicesPrices: {
+        'General Consultation': 8000,
+        'Specialist Consultation': 18000,
+        'Full Blood Count': 6000,
+        'Abdominal/Obstetric Ultrasound': 18000,
+        'Chest X-Ray': 15000,
+        'Inpatient Admission': 35000,
+      },
       lat: -1.9680,
       lng: 30.1380,
     ),
@@ -118,6 +241,11 @@ class CuratedHospitals {
       email: 'alliancearenaclinic@gmail.com',
       worksBritam: true,
       worksUAP: true,
+      servicesPrices: {
+        'General Consultation': 7000,
+        'Full Blood Count': 5000,
+        'Abdominal/Obstetric Ultrasound': 15000,
+      },
       lat: -1.9050,
       lng: 30.1350,
     ),
@@ -130,6 +258,12 @@ class CuratedHospitals {
       email: 'kmc.polyclinic@yahoo.com',
       worksBritam: true,
       worksUAP: true,
+      servicesPrices: {
+        'General Consultation': 12000,
+        'Specialist Consultation': 22000,
+        'Full Blood Count': 9000,
+        'Abdominal/Obstetric Ultrasound': 25000,
+      },
       lat: -1.9310,
       lng: 30.1180,
     ),
@@ -142,6 +276,12 @@ class CuratedHospitals {
       email: 'ubuzimaclinic@gmail.com',
       worksBritam: true,
       worksUAP: true,
+      servicesPrices: {
+        'General Consultation': 10000,
+        'Specialist Consultation': 20000,
+        'Full Blood Count': 8000,
+        'Abdominal/Obstetric Ultrasound': 22000,
+      },
       lat: -1.9295,
       lng: 30.1175,
     ),
@@ -154,6 +294,12 @@ class CuratedHospitals {
       email: 'info@solaceministries.org',
       worksBritam: true,
       worksUAP: true,
+      servicesPrices: {
+        'General Consultation': 12000,
+        'Specialist Consultation': 25000,
+        'Abdominal/Obstetric Ultrasound': 25000,
+        'Standard Maternity Delivery': 150000,
+      },
       lat: -1.9060,
       lng: 30.1370,
     ),
@@ -166,6 +312,14 @@ class CuratedHospitals {
       email: 'masaka.hospital@moh.gov.rw',
       worksBritam: true,
       worksUAP: true,
+      servicesPrices: {
+        'General Consultation': 3000,
+        'Specialist Consultation': 8000,
+        'Full Blood Count': 2500,
+        'Abdominal/Obstetric Ultrasound': 7000,
+        'Chest X-Ray': 8000,
+        'Inpatient Admission': 10000,
+      },
       lat: -1.9920,
       lng: 30.1020,
     ),
@@ -176,6 +330,17 @@ class CuratedHospitals {
     final sorted = List<CuratedHospital>.from(all);
     sorted.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
     return sorted;
+  }
+
+  /// Returns hospitals offering the given service, sorted by cheapest co-payment.
+  static List<CuratedHospital> searchByServiceAndPrice(String serviceName, String insurance) {
+    final matches = all.where((h) => h.servicesPrices.containsKey(serviceName)).toList();
+    matches.sort((a, b) {
+      final aCopay = a.calculateCopay(serviceName, insurance);
+      final bCopay = b.calculateCopay(serviceName, insurance);
+      return aCopay.compareTo(bCopay);
+    });
+    return matches;
   }
 
   /// Returns hospitals filtered by insurance plan, sorted by distance.
