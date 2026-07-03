@@ -8,14 +8,16 @@ An offline-first, private-by-design mobile application built with Flutter that r
 1. [Key Features](#key-features)
 2. [GitHub Repository](#github-repository)
 3. [System Architecture & Data Flow](#system-architecture--data-flow)
-4. [App Interface & Walkthrough Screenshot Guide](#app-interface--walkthrough-screenshot-guide)
-5. [Environment Setup & APK Build Instructions](#environment-setup--apk-build-instructions)
-6. [Offline Contract Processing Pipeline](#offline-contract-processing-pipeline)
-7. [Deployment & Release Plan](#deployment--release-plan)
-8. [Performance Benchmarks & Safeguards](#performance-benchmarks--safeguards)
-9. [Tech Stack](#tech-stack)
-10. [Walkthrough Demo Video](#walkthrough-demo-video)
-11. [License](#license)
+4. [How Ranga Works: Interface Walkthrough](#how-ranga-works-interface-walkthrough)
+5. [App Interface & Walkthrough Screenshot Guide](#app-interface--walkthrough-screenshot-guide)
+6. [How to Download & Install the APK](#how-to-download--install-the-apk)
+7. [Environment Setup & APK Build Instructions](#environment-setup--apk-build-instructions)
+8. [Offline Contract Processing Pipeline](#offline-contract-processing-pipeline)
+9. [Deployment & Release Plan](#deployment--release-plan)
+10. [Performance Benchmarks & Safeguards](#performance-benchmarks--safeguards)
+11. [Tech Stack](#tech-stack)
+12. [Walkthrough Demo Video](#walkthrough-demo-video)
+13. [License](#license)
 
 ---
 
@@ -86,34 +88,117 @@ graph TD
 
 ---
 
+## How Ranga Works: Interface Walkthrough
+
+Ranga utilizes a modern, glassmorphic dark-pastel aesthetic designed to provide an interactive, reassuring user experience. Below is a detailed walkthrough of how the application operates, referenced against the actual app screenshots.
+
+### Step 1: Welcome & Identity Branding (Welcome Screen)
+The welcome screen introduces the student to Ranga and establishes the core theme: 100% offline, private-by-design AI health support.
+
+![Welcome Screen](app/docs/welcome.png)
+
+- **First-Launch Hook**: Features a clean holographic brand identity with a quick overview of key functionalities (Offline AI assistant, contract parsing, voice capabilities).
+- **Setup Trigger**: Tapping "Get Started" triggers the system verification check, looking for pre-cached SQLite files and local model weights.
+
+---
+
+### Step 2: Local LLM Installation (Downloading Model Screen)
+If the device doesn't have the local model files pre-installed, Ranga manages the model provisioning process through a structured download interface.
+
+![Model Downloading Screen](app/docs/downlaoding.png)
+
+- **Progress & Metrics**: Displays download progress, download speed, and remaining file size for the 2.4 GB `gemma-4-E2B-it.litertlm` file fetched from HuggingFace.
+- **Resumable Connection**: Designed with range-request fallback mechanisms, ensuring the download resumes smoothly even under unstable network conditions in Rwanda.
+
+---
+
+### Step 3: Onboarding & App Setup (Home Screen)
+The home screen serves as the initial portal for profile creation and document uploading once the model setup is complete.
+
+![Home Screen](app/docs/homeScreen.png)
+
+- **Registration Stage**: Students register by inputting their name and selecting their health insurance provider (CBHI Mutuelle de Santé, Britam, UAP Old Mutual, or No Insurance).
+- **Contract Upload**: Users upload their medical insurance card/contract as a PDF or image, which acts as the source document for the local extraction process.
+
+---
+
+### Step 4: Local AI Personalization & Context (Student Profile Sidebar)
+The student profile drawer provides a persistent view of the student's context, parsed locally from their uploaded documents.
+
+![Student Profile Sidebar](app/docs/sidebarconsultation.png)
+
+- **AI-Powered Analysis**: During initialization, the local Ranga Model parses the uploaded contract text or image bytes, extracting co-payment rates, policy numbers, benefit ceilings, and excluded networks.
+- **Context Steering**: The resulting benefit summary is saved to the local SQLite database and automatically appended to the system prompt context for subsequent chat sessions.
+
+---
+
+### Step 5: Private AI Consultations (Consulting Screen)
+The consulting screen is where real-time, offline health guidance takes place.
+
+![Consulting Screen](app/docs/consultingascreen.png)
+
+- **Performance Bar**: The green bar at the top displays real-time telemetry, identifying GPU delegate acceleration (Vulkan/Metal), token generation rate (e.g. ~52 tok/s), and thermal states.
+- **Voice Capabilities**: Full integration of local Speech-to-Text (STT) and Text-to-Speech (TTS) engines allows students to speak their queries and hear Ranga's replies.
+- **Local Hospital Matching**: Automatically checks symptom context against local Rwandan health infrastructure (e.g., suggesting Legacy Clinics or King Faisal Hospital for Britam/UAP users, or district referral hospitals for Mutuelle users) and calculates co-pays.
+
+---
+
 ## App Interface & Walkthrough Screenshot Guide
 
-To prepare your capstone report, capture the following **five screenshots** of the running app. Use the descriptions below to explain each visual interface in your final slide deck or report:
+To prepare your capstone report, capture the following **five screenshots** of the running app. Use the previews and descriptions below to explain each visual interface in your final slide deck or report:
 
 ### Screenshot 1: Dashboard Home Page & Conversations Sidebar
-- **Filename Suggestion**: `1_dashboard_sidebar.png`
+![Dashboard Home Page & Conversations Sidebar](app/docs/sidebarconsultation.png)
+
 - **What to Capture**: Open the application to the blank chat state, and tap the top-left menu icon to expand the sidebar drawer.
-- **Description in Report**: "This screenshot displays Ranga's dark forest green dashboard empty state featuring helpful pre-configured student queries (Clinic & Emergency, In-Network Hospitals, Nearest Pharmacy, Student Insurance). The expanded sidebar drawer shows the session history list where students can manage previous conversation logs, add new chat channels, or access the settings screen."
+- **Description in Report**: *"This screenshot displays Ranga's dark forest green dashboard empty state featuring helpful pre-configured student queries (Clinic & Emergency, In-Network Hospitals, Nearest Pharmacy, Student Insurance). The expanded sidebar drawer shows the session history list where students can manage previous conversation logs, add new chat channels, or access the settings screen."*
+
+---
 
 ### Screenshot 2: Reworked Settings & Configuration Screen
-- **Filename Suggestion**: `2_settings_profile.png`
+![Reworked Settings & Configuration Screen](app/docs/settings.png)
+
 - **What to Capture**: Click the **Settings** button at the bottom of the sidebar drawer. Scroll to show the profile name field, limited insurance dropdown, performance metrics toggle, and the database sync tile.
-- **Description in Report**: "Shows the settings manager. Students can register their details, pick their exact insurance provider (None, UAP Old Mutual, Britam, or Mutuelle de Santé), write medical notes, and toggle the performance stats switch. The **Database Sync** block displays the last synchronized timestamp from Firebase and features a 'Sync Now' button for updating the hospital directory dynamically."
+- **Description in Report**: *"Shows the settings manager. Students can register their details, pick their exact insurance provider (None, UAP Old Mutual, Britam, or Mutuelle de Santé), write medical notes, and toggle the performance stats switch. The Database Sync block displays the last synchronized timestamp from Firebase and features a 'Sync Now' button for updating the hospital directory dynamically."*
+
+---
 
 ### Screenshot 3: Chat Screen & Hospital Carousel
-- **Filename Suggestion**: `3_chat_hospital_carousel.png`
+![Chat Screen & Hospital Carousel](app/docs/hospitalrecomendations.png)
+
 - **What to Capture**: Type a question seeking medical advice, such as *"I fractured my bone playing, where should I go?"*. Let the model stream the response and render the horizontal swipeable cards list under it.
-- **Description in Report**: "Demonstrates Ranga's agentic hospital matching. When the student query seeks clinic recommendations, the Ranga Model (based on Gemma 4) streams a short answer and appends the hospital recommendation tag. Below the text, a horizontal swipeable card list displays the nearest facilities, network coverage, and estimated co-payments at the bottom. Below the carousel, a green left-bordered comparison card explains the cheapest vs. closest options."
+- **Description in Report**: *"Demonstrates Ranga's agentic hospital matching. When the student query seeks clinic recommendations, the Ranga Model (based on Gemma 4) streams a short answer and appends the hospital recommendation tag. Below the text, a horizontal swipeable card list displays the nearest facilities, network coverage, and estimated co-payments at the bottom. Below the carousel, a green left-bordered comparison card explains the cheapest vs. closest options."*
+
+---
 
 ### Screenshot 4: Performance Telemetry & Stats Pill
-- **Filename Suggestion**: `4_chat_stats_telemetry.png`
+![Performance Telemetry & Stats Pill](app/docs/consultingascreen.png)
+
 - **What to Capture**: Ensure the 'Show Generation Stats' toggle is on in settings. Ask a general query (like *"What is a co-payment?"*), and focus the screenshot on the small stats pill displayed at the bottom of the AI bubble.
-- **Description in Report**: "Illustrates live performance telemetry. When enabled in settings, a stats badge renders directly under the AI chat bubbles showing the speed in tokens/second (e.g. `45.8 tokens/sec`) and total generation time (e.g. `2.40s`), verifying that model inference is running locally and efficiently on the Ranga Model."
+- **Description in Report**: *"Illustrates live performance telemetry. When enabled in settings, a stats badge renders directly under the AI chat bubbles showing the speed in tokens/second (e.g. 45.8 tokens/sec) and total generation time (e.g. 2.40s), verifying that model inference is running locally and efficiently on the Ranga Model."*
+
+---
 
 ### Screenshot 5: Expandable Cost Breakdown & Contacts Sheet
-- **Filename Suggestion**: `5_cost_breakdown_bottom_sheet.png`
+![Expandable Cost Breakdown & Contacts Sheet](app/docs/costbreakdown.png)
+
 - **What to Capture**: Tap on one of the hospital cards in the carousel to slide up the full cost breakdown sheet. Scroll down to show the detailed services price table and the phone/email contact icons.
-- **Description in Report**: "Displays the comprehensive bottom sheet showing the complete service-by-service copay breakdown. It lists the service name, base cash price, insurer cover, and patient share, alongside direct action icons to call or email the selected facility immediately."
+- **Description in Report**: *"Displays the comprehensive bottom sheet showing the complete service-by-service copay breakdown. It lists the service name, base cash price, insurer cover, and patient share, alongside direct action icons to call or email the selected facility immediately."*
+
+---
+
+## How to Download & Install the APK
+
+You can download the compiled production APK directly from this repository to install on your Android device:
+
+1. **Direct Download Link**: 
+   👉 **[Download ranga.apk](https://github.com/tuyishimejeandamour/capstone/raw/main/release/ranga.apk)**
+2. **Local Path**: 
+   If you have cloned this repository, the build output is stored locally at `release/ranga.apk`.
+3. **Installation Steps**:
+   - Transfer `ranga.apk` to your Android device (if downloaded on a PC).
+   - Tap the file to install. Ensure that **"Install from Unknown Sources"** is allowed in your device settings.
+   - On launch, the app will run the environment checks and prepare the on-device AI model.
 
 ---
 
@@ -197,7 +282,7 @@ flowchart TD
   - The initial application bundle size of **Ranga** is small (~25MB).
   - On the first boot, the app displays a beautiful holographic screen prompting a one-time download of the 2.4 GB `gemma-4-E2B-it.litertlm` file from HuggingFace to the local application document storage.
   - **Sideloading for Testing/Examiners**: To skip the download during assessment, copy the model file `gemma-4-E2B-it.litertlm` directly into the device's internal storage path:
-    `/Android/data/tuyishimejeandamour.capstone/files/gemma-model.litertlm`
+    `/Android/data/com.ranga.app/files/gemma-model.litertlm`
 
 ---
 
@@ -226,7 +311,7 @@ flowchart TD
 - **Audio processing**: `speech_to_text` and `flutter_tts` for voice interaction loops
 - **File System Utils**: `file_picker` & `read_pdf_text`
 
-
+---
 
 ## Walkthrough Demo Video
 

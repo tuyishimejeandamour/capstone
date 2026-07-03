@@ -1,4 +1,4 @@
-package com.ondeviceai.on_device_ai
+package com.ranga.app
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.ondeviceai.on_device_ai"
+    namespace = "com.ranga.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.ondeviceai.on_device_ai"
+        applicationId = "com.ranga.app"
         minSdk = 26 // Android 8.0+ required for on-device LLM inference
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
