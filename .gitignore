@@ -1,6 +1,5 @@
 .venv
 /node_modules
 node_modules
-/release
 training/results/
 training/.pytest_cache/
