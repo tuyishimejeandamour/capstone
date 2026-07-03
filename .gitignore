@@ -3,3 +3,5 @@
 node_modules
 training/results/
 training/.pytest_cache/
+release/
+dataset/ranga_output/ranga_generator_jobs.jsonl
