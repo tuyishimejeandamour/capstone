@@ -3,11 +3,10 @@
     "type": "function",
     "function": {
       "name": "getCurrentLocation",
-      "description": "Get current patient coordinates",
+      "description": "Get student GPS.",
       "parameters": {
         "type": "object",
-        "properties": {},
-        "required": []
+        "properties": {}
       }
     }
   },
@@ -15,45 +14,17 @@
     "type": "function",
     "function": {
       "name": "getInsuranceCoverageBlock",
-      "description": "Get details of insurance policies",
+      "description": "Insurance block.",
       "parameters": {
         "type": "object",
         "properties": {
           "insurance": {
-            "type": "string",
-            "description": "Name of the insurance provider (e.g. 'Britam', 'Old Mutual')."
+            "type": "string"
           }
         },
-        "required": ["insurance"]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "searchHospitalsByCondition",
-      "description": "Search hospitals by health condition and location",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "condition": {
-            "type": "string",
-            "description": "Health condition, symptoms, or medical specialty needed."
-          },
-          "coverageBlock": {
-            "type": "object",
-            "description": "The insurance coverage details including providerName, copayPercent, and outpatientCovered."
-          },
-          "lat": {
-            "type": "number",
-            "description": "Patient's latitude coordinate."
-          },
-          "lng": {
-            "type": "number",
-            "description": "Patient's longitude coordinate."
-          }
-        },
-        "required": ["condition", "coverageBlock", "lat", "lng"]
+        "required": [
+          "insurance"
+        ]
       }
     }
   },
@@ -61,20 +32,56 @@
     "type": "function",
     "function": {
       "name": "getNearbyHospitals",
-      "description": "Get nearby approved hospitals based on patient location",
+      "description": "Nearby hospitals.",
       "parameters": {
         "type": "object",
         "properties": {
           "lat": {
-            "type": "number",
-            "description": "Patient's latitude coordinate."
+            "type": "number"
           },
           "lng": {
-            "type": "number",
-            "description": "Patient's longitude coordinate."
+            "type": "number"
+          },
+          "radiusKm": {
+            "type": "number"
+          },
+          "coverageBlock": {
+            "type": "object"
           }
         },
-        "required": ["lat", "lng"]
+        "required": [
+          "lat",
+          "lng",
+          "coverageBlock"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "searchHospitalsByCondition",
+      "description": "Hospitals by condition.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "condition": {
+            "type": "string"
+          },
+          "coverageBlock": {
+            "type": "object"
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lng": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "condition",
+          "coverageBlock"
+        ]
       }
     }
   },
@@ -82,23 +89,21 @@
     "type": "function",
     "function": {
       "name": "rankHospitalsByPriorityAndCost",
-      "description": "Rank hospitals by priority, distance, and copay cost",
+      "description": "Rank hospitals.",
       "parameters": {
         "type": "object",
         "properties": {
           "hospitals": {
-            "type": "array",
-            "items": {
-              "type": "object"
-            },
-            "description": "List of hospital candidates to rank."
+            "type": "array"
           },
           "coverageBlock": {
-            "type": "object",
-            "description": "The insurance coverage details including providerName, copayPercent, and outpatientCovered."
+            "type": "object"
           }
         },
-        "required": ["hospitals", "coverageBlock"]
+        "required": [
+          "hospitals",
+          "coverageBlock"
+        ]
       }
     }
   }

@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -56,6 +56,7 @@ class DatabaseHelper {
         content_text TEXT NOT NULL,
         input_type TEXT NOT NULL, -- 'text' or 'audio'
         created_at TEXT NOT NULL,
+        cost_summary_json TEXT,
         FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE
       )
     ''');
@@ -85,6 +86,9 @@ class DatabaseHelper {
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await _createHospitalsTable(db);
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE messages ADD COLUMN cost_summary_json TEXT');
     }
   }
 
@@ -224,6 +228,7 @@ class DatabaseHelper {
     required String text,
     required bool isUser,
     required String inputType,
+    String? costSummaryJson,
   }) async {
     final db = await instance.database;
     final now = DateTime.now().toIso8601String();
@@ -235,6 +240,7 @@ class DatabaseHelper {
       'content_text': text,
       'input_type': inputType,
       'created_at': now,
+      'cost_summary_json': costSummaryJson,
     });
 
     // Update conversation's updated_at timestamp

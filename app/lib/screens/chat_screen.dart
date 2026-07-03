@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -8,11 +8,14 @@ import '../services/performance_monitor.dart';
 import '../services/database_helper.dart';
 import '../services/speech_service.dart';
 import '../services/tts_service.dart';
+import '../services/hospital_cost_model.dart';
+import '../services/curated_hospitals.dart';
 import '../widgets/chat_bubble.dart';
 import '../widgets/typing_indicator.dart';
 import '../widgets/holographic_sphere.dart';
 import 'speech_screen.dart';
 import 'hospital_search_screen.dart';
+import 'settings_screen.dart';
 
 // Color tokens matching the refined deep forest green theme
 const _kBgColor = Color(0xFF081510);
@@ -21,7 +24,6 @@ const _kElevatedColor = Color(0xFF132A1A);
 const _kAccentColor = Color(0xFF3BE2B0);
 const _kErrorColor = Color(0xFFE56B6B);
 const _kDisabledColor = Color(0xFF0E2016);
-const _kVioletColor = Color(0xFF926BFF);
 const _kBorderColor = Color(0xFF1E3525);
 
 /// Main chat interface for interacting with Gemma 4 E2B on-device.
@@ -59,7 +61,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String _studentInsurance = 'None';
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _historyController = TextEditingController();
-  String _contractSummary = '';
+  bool _showMetrics = false;
 
   @override
   void initState() {
@@ -97,21 +99,13 @@ class _ChatScreenState extends State<ChatScreen> {
       'history_summary',
       defaultValue: 'No prior health issues recorded.',
     );
-    final contractSummary = await db.getProfileValue(
-      'insurance_contract_summary',
-      defaultValue: '',
-    );
 
     // Validate that the loaded insurance is one of the valid dropdown items
     const validInsurances = [
       'None',
       'Mutuelle',
-      'RSSB',
-      'MMI',
-      'Sanlam',
       'Britam',
       'UAP',
-      'Radiant',
     ];
     final validatedInsurance = validInsurances.contains(insurance)
         ? insurance
@@ -120,12 +114,17 @@ class _ChatScreenState extends State<ChatScreen> {
       await db.setProfileValue('insurance', 'None');
     }
 
+    final showMetricsStr = await db.getProfileValue(
+      'show_performance_metrics',
+      defaultValue: 'false',
+    );
+
     setState(() {
       _studentName = name;
       _nameController.text = name;
       _studentInsurance = validatedInsurance;
       _historyController.text = historySummary;
-      _contractSummary = contractSummary;
+      _showMetrics = showMetricsStr == 'true';
     });
 
     await _loadConversationsList();
@@ -172,11 +171,22 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() {
       for (final msg in list) {
+        final costSummaryJson = msg['cost_summary_json'] as String?;
+        HospitalCostSummary? costSummary;
+        if (costSummaryJson != null && costSummaryJson.isNotEmpty) {
+          try {
+            costSummary = HospitalCostSummary.fromJson(
+              jsonDecode(costSummaryJson) as Map<String, dynamic>,
+            );
+          } catch (_) {}
+        }
+
         _messages.add(
           _ChatMessage(
             text: msg['content_text'] as String,
             isUser: msg['sender_type'] == 'user',
             inputType: msg['input_type'] as String,
+            costSummary: costSummary,
           ),
         );
       }
@@ -198,30 +208,6 @@ class _ChatScreenState extends State<ChatScreen> {
       _activeConversationId = null;
     }
     await _loadConversationsList();
-  }
-
-  Future<void> _saveStudentProfile() async {
-    final db = DatabaseHelper.instance;
-    final name = _nameController.text.trim();
-    await db.setProfileValue(
-      'student_name',
-      name.isNotEmpty ? name : 'Student',
-    );
-    await db.setProfileValue('insurance', _studentInsurance);
-    await db.setProfileValue('history_summary', _historyController.text.trim());
-
-    setState(() {
-      _studentName = name.isNotEmpty ? name : 'Student';
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Student profile details updated successfully.'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
   }
 
   /// Threshold (in logical pixels) for scroll snapping
@@ -324,6 +310,7 @@ class _ChatScreenState extends State<ChatScreen> {
     widget.performanceMonitor.startSession();
 
     try {
+      String rawStreamingText = '';
       final stream = widget.gemmaService.sendMessage(
         text,
         activeConversationId: conversationId,
@@ -331,11 +318,13 @@ class _ChatScreenState extends State<ChatScreen> {
       _generationSub = stream.listen(
         (token) {
           if (!mounted) return;
+          rawStreamingText += token;
           final shouldStick = _isNearBottom();
           setState(() {
             if (aiMessageIndex < _messages.length) {
+              final cleanText = rawStreamingText.replaceAll(RegExp(r'\[SHOW_HOSPITALS:?[^\]]*\]?'), '');
               _messages[aiMessageIndex] = _ChatMessage(
-                text: _messages[aiMessageIndex].text + token,
+                text: cleanText,
                 isUser: false,
                 inputType: 'text',
               );
@@ -346,7 +335,34 @@ class _ChatScreenState extends State<ChatScreen> {
         onDone: () async {
           if (!mounted) return;
           final truncated = widget.gemmaService.wasLastGenerationTruncated;
-          final finalAiText = _messages[aiMessageIndex].text;
+
+          // Parse the special hospital display tag from the raw text
+          final regExp = RegExp(r'\[SHOW_HOSPITALS:\s*([^\]]+)\]');
+          final match = regExp.firstMatch(rawStreamingText);
+          HospitalCostSummary? costSummary;
+
+          // Clean up the text by stripping the tag completely
+          final finalAiText = rawStreamingText.replaceAll(regExp, '').trim();
+
+          if (match != null) {
+            final condition = match.group(1)!.trim();
+            final insurance = await DatabaseHelper.instance.getProfileValue('insurance', defaultValue: 'None');
+            final hospitals = CuratedHospitals.forCondition(condition);
+            costSummary = CuratedHospitals.buildCostSummary(
+              hospitals,
+              insurance: insurance,
+              condition: condition,
+              maxShown: 3,
+            );
+          }
+
+          final tps = widget.gemmaService.tokensPerSecond;
+          final timeMs = widget.gemmaService.generationTimeMs;
+
+          String? costSummaryJson;
+          if (costSummary != null) {
+            costSummaryJson = jsonEncode(costSummary.toJson());
+          }
 
           // 3. Save Assistant Message to Database
           await DatabaseHelper.instance.saveMessage(
@@ -354,19 +370,20 @@ class _ChatScreenState extends State<ChatScreen> {
             text: finalAiText,
             isUser: false,
             inputType: 'text',
+            costSummaryJson: costSummaryJson,
           );
 
           setState(() {
             _isGenerating = false;
-            if (truncated && aiMessageIndex < _messages.length) {
-              final msg = _messages[aiMessageIndex];
-              _messages[aiMessageIndex] = _ChatMessage(
-                text: msg.text,
-                isUser: false,
-                wasTruncated: true,
-                inputType: 'text',
-              );
-            }
+            _messages[aiMessageIndex] = _ChatMessage(
+              text: finalAiText,
+              isUser: false,
+              wasTruncated: truncated,
+              inputType: 'text',
+              costSummary: costSummary,
+              tokensPerSecond: tps > 0 ? tps : null,
+              generationTimeMs: timeMs > 0 ? timeMs : null,
+            );
           });
           widget.performanceMonitor.endSession();
 
@@ -501,6 +518,10 @@ class _ChatScreenState extends State<ChatScreen> {
                             onPlayAudio: !msg.isUser
                                 ? () => _ttsService.speak(msg.text)
                                 : null,
+                            costSummary: msg.costSummary,
+                            tokensPerSecond: msg.tokensPerSecond,
+                            generationTimeMs: msg.generationTimeMs,
+                            showMetrics: _showMetrics,
                           );
 
                           if (isLatestBubble &&
@@ -619,376 +640,210 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  /// Sliding Drawer displaying persistent Student Profile Context & History List
+  /// Conversations-only sidebar drawer with a Settings shortcut at the bottom.
   Widget _buildStudentDrawer() {
     return Drawer(
-      backgroundColor: _kSurfaceColor.withValues(alpha: 0.6),
+      backgroundColor: _kSurfaceColor,
       elevation: 0,
-      width: MediaQuery.of(context).size.width * 0.85,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 20.0,
-              vertical: 12.0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: _kAccentColor.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.psychology_rounded,
-                        color: _kAccentColor,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Student Profile',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.3,
-                            ),
+      width: MediaQuery.of(context).size.width * 0.82,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 8, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Conversations',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
                           ),
-                          Text(
-                            'On-Device AI Context Summary',
-                            style: TextStyle(
-                              color: Colors.white38,
-                              fontSize: 11,
-                            ),
+                        ),
+                        Text(
+                          '$_studentName\'s sessions',
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 11,
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-                const Divider(),
-                const SizedBox(height: 16),
-
-                // Student Name Editor
-                const Text(
-                  'YOUR NAME',
-                  style: TextStyle(
-                    color: _kAccentColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _nameController,
-                  textCapitalization: TextCapitalization.words,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  decoration: InputDecoration(
-                    fillColor: _kElevatedColor,
-                    filled: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: _kAccentColor,
-                        width: 1.5,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: _kBorderColor,
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                  onChanged: (_) {
-                    _saveStudentProfile();
-                  },
-                ),
-                const SizedBox(height: 20),
-
-                // Student Insurance Picker (Lookups & Network Hospital Matching)
-                const Text(
-                  'YOUR INSURANCE PLAN',
-                  style: TextStyle(
-                    color: _kAccentColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: _kElevatedColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _kBorderColor, width: 1),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _studentInsurance,
-                      dropdownColor: _kElevatedColor,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      icon: const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: _kAccentColor,
-                      ),
-                      isExpanded: true,
-                      onChanged: (newValue) {
-                        if (newValue != null) {
-                          setState(() {
-                            _studentInsurance = newValue;
-                          });
-                          _saveStudentProfile();
-                        }
-                      },
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'None',
-                          child: Text('No Insurance / Out-of-pocket'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Britam',
-                          child: Text('Britam Insurance'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'UAP',
-                          child: Text('Old Mutual / UAP'),
                         ),
                       ],
                     ),
                   ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Persistent Medical / History Notes
-                const Text(
-                  'HISTORY SUMMARY NOTES',
-                  style: TextStyle(
-                    color: _kAccentColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _historyController,
-                  maxLines: 3,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                  decoration: InputDecoration(
-                    hintText:
-                        'Enter student habits, wellness goals, or chronic logs...',
-                    fillColor: _kElevatedColor,
-                    contentPadding: const EdgeInsets.all(12),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: _kAccentColor,
-                        width: 1.5,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: _kBorderColor,
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                  onChanged: (_) {
-                    _saveStudentProfile();
-                  },
-                ),
-
-                if (_contractSummary.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  const Text(
-                    'GEMMA 4 CONTRACT SUMMARY',
-                    style: TextStyle(
+                  IconButton(
+                    icon: const Icon(
+                      Icons.add_rounded,
                       color: _kAccentColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.0,
+                      size: 24,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    constraints: const BoxConstraints(maxHeight: 120),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: _kElevatedColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: _kBorderColor, width: 1),
-                    ),
-                    child: SingleChildScrollView(
-                      child: Text(
-                        _contractSummary,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
+                    tooltip: 'New conversation',
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _startNewConversation();
+                    },
                   ),
                 ],
+              ),
+            ),
 
-                const SizedBox(height: 24),
-                const Divider(),
-                const SizedBox(height: 16),
+            Divider(
+              color: _kBorderColor,
+              height: 1,
+              indent: 20,
+              endIndent: 20,
+            ),
+            const SizedBox(height: 6),
 
-                // Historical Consultations Sessions List
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'PAST CONSULTATIONS',
-                      style: TextStyle(
-                        color: Colors.white38,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
+            // Conversations list
+            Expanded(
+              child: _conversations.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No conversations yet.',
+                        style: TextStyle(color: Colors.white24, fontSize: 12),
                       ),
-                    ),
-                    TextButton.icon(
-                      onPressed: _startNewConversation,
-                      icon: const Icon(
-                        Icons.add,
-                        size: 14,
-                        color: _kAccentColor,
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
                       ),
-                      label: const Text(
-                        'NEW',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                  ],
-                ),
+                      itemCount: _conversations.length,
+                      itemBuilder: (context, index) {
+                        final conv = _conversations[index];
+                        final convId = conv['id'] as int;
+                        final isSelected = convId == _activeConversationId;
 
-                Expanded(
-                  child: _conversations.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'No past consultations found.',
-                            style: TextStyle(
-                              color: Colors.white24,
-                              fontSize: 12,
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 4),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? _kElevatedColor
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 12),
+                            dense: true,
+                            horizontalTitleGap: 8,
+                            onTap: () {
+                              Navigator.pop(context);
+                              _loadConversation(convId);
+                            },
+                            leading: Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              size: 16,
+                              color:
+                                  isSelected ? _kAccentColor : Colors.white38,
+                            ),
+                            title: Text(
+                              conv['title'] as String,
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : Colors.white70,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                fontSize: 13,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline_rounded,
+                                size: 14,
+                                color: Colors.white24,
+                              ),
+                              tooltip: 'Delete session',
+                              onPressed: () => _deleteConversation(convId),
                             ),
                           ),
-                        )
-                      : ListView.builder(
-                          itemCount: _conversations.length,
-                          itemBuilder: (context, index) {
-                            final conv = _conversations[index];
-                            final convId = conv['id'] as int;
-                            final isSelected = convId == _activeConversationId;
-
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 6),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? _kElevatedColor
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                ),
-                                horizontalTitleGap: 8,
-                                dense: true,
-                                onTap: () {
-                                  Navigator.pop(context); // Close Drawer
-                                  _loadConversation(convId);
-                                },
-                                leading: Icon(
-                                  Icons.chat_bubble_outline_rounded,
-                                  size: 16,
-                                  color: isSelected
-                                      ? _kAccentColor
-                                      : Colors.white38,
-                                ),
-                                title: Text(
-                                  conv['title'] as String,
-                                  style: TextStyle(
-                                    color: isSelected
-                                        ? Colors.white
-                                        : Colors.white70,
-                                    fontWeight: isSelected
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    fontSize: 13,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                trailing: IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline_rounded,
-                                    size: 14,
-                                    color: Colors.white24,
-                                  ),
-                                  tooltip: 'Delete session',
-                                  onPressed: () {
-                                    _deleteConversation(convId);
-                                  },
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-
-                const SizedBox(height: 12),
-              ],
+                        );
+                      },
+                    ),
             ),
-          ),
+
+            // Settings button at the bottom of the drawer
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.pop(context); // close drawer first
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SettingsScreen(),
+                    ),
+                  ).then((_) => _initAppSession()); // reload profile on return
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 13,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _kElevatedColor,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _kBorderColor, width: 1),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.settings_outlined,
+                        color: _kAccentColor.withValues(alpha: 0.7),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Settings',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              'Profile, insurance & preferences',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.35),
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        color: Colors.white24,
+                        size: 12,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
+
 
 // ---------------------------------------------------------------------------
 // Personalized Empty State Dashboard (Replicating Screen 2 mockup)
@@ -1023,7 +878,7 @@ class _EmptyState extends StatelessWidget {
           Text(
                 'Hello, $studentName',
                 style: const TextStyle(
-                  color: _kVioletColor,
+                  color: Colors.white,
                   fontSize: 26,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.6,
@@ -1059,32 +914,32 @@ class _EmptyState extends StatelessWidget {
             children: [
               _buildDashboardCard(
                 icon: Icons.local_hospital_outlined,
-                title: 'Campus Clinic Hours',
-                subtitle: 'Find clinic contact, general hours, & hotlines.',
+                title: 'Clinic & Emergency',
+                subtitle: 'Get quick numbers for campus clinic & emergency hotlines.',
                 color: _kAccentColor,
-                onTap: () => onCardTap('What are the campus clinic hours?'),
+                onTap: () => onCardTap('What are the emergency health contacts for ALU students?'),
               ).animate().scale(delay: 350.ms, curve: Curves.easeOutBack),
               _buildDashboardCard(
                 icon: Icons.health_and_safety_outlined,
                 title: 'In-Network Hospitals',
-                subtitle: 'Find hospitals near you that accept your plan.',
-                color: const Color(0xFFE2B0FF),
+                subtitle: 'Find closest facilities accepting student insurance.',
+                color: const Color(0xFF56A6C8),
                 onTap: onFindHospitals,
               ).animate().scale(delay: 450.ms, curve: Curves.easeOutBack),
               _buildDashboardCard(
-                icon: Icons.spa_outlined,
-                title: 'Stress & Anxiety Support',
-                subtitle: 'Get warm wellness coping steps and guidance.',
-                color: const Color(0xFFB0D2FF),
-                onTap: () => onCardTap('How can I manage stress and anxiety?'),
+                icon: Icons.local_pharmacy_outlined,
+                title: 'Nearest Pharmacy',
+                subtitle: 'Locate local pharmacy shops around Masoro.',
+                color: const Color(0xFFFFB380),
+                onTap: () => onCardTap('Where is the nearest pharmacy to ALU Masoro campus?'),
               ).animate().scale(delay: 550.ms, curve: Curves.easeOutBack),
               _buildDashboardCard(
-                icon: Icons.lightbulb_outline_rounded,
-                title: 'General Wellness Plan',
-                subtitle: 'Suggestions on daily hydration, sleep & habit logs.',
-                color: const Color(0xFFFFDFB0),
+                icon: Icons.shield_outlined,
+                title: 'Student Insurance',
+                subtitle: 'Explain student Britam vs UAP Old Mutual copay policy details.',
+                color: const Color(0xFF80FFC4),
                 onTap: () =>
-                    onCardTap('Give me a general daily wellness plan.'),
+                    onCardTap('Explain student insurance copay policies for Britam and Old Mutual.'),
               ).animate().scale(delay: 650.ms, curve: Curves.easeOutBack),
             ],
           ),
@@ -1326,11 +1181,17 @@ class _ChatMessage {
   final bool isUser;
   final bool wasTruncated;
   final String inputType;
+  final HospitalCostSummary? costSummary;
+  final double? tokensPerSecond;
+  final int? generationTimeMs;
 
   const _ChatMessage({
     required this.text,
     required this.isUser,
     this.wasTruncated = false,
     required this.inputType,
+    this.costSummary,
+    this.tokensPerSecond,
+    this.generationTimeMs,
   });
 }

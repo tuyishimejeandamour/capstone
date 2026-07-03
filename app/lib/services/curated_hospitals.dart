@@ -4,6 +4,8 @@
 /// This list is authoritative — the AI will ONLY recommend facilities from here.
 library;
 
+import 'hospital_cost_model.dart';
+
 class MedicalService {
   final String name;
   final bool isInpatient;
@@ -395,50 +397,259 @@ class CuratedHospitals {
       ..sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
   }
 
-  /// Returns the financial co-payment policy and coverage rules for the given plan
-  /// extracted from dataset/rwanda_insurance_financial_policies.md.
+  /// Returns the financial co-payment policy and coverage rules for the given plan.
   static String getCopayInfo(String insurance) {
     final ins = insurance.toLowerCase();
-    if (ins.contains('britam')) {
-      return '  * **Inpatient Care**: 0% Co-payment (100% Covered up to overall family limit)\n'
-             '  * **Outpatient Care**: Excluded (100% paid out-of-pocket by member)\n'
-             '  * *Policy rules: Requires full annual premium payment upfront. Pre-existing, chronic, and psychiatric conditions must be declared and accepted in writing.*';
-    } else if (ins.contains('uap') || ins.contains('mutual')) {
-      return '  * **Inpatient Care**: 10% Co-payment (Old Mutual covers 90% up to limits)\n'
-             '  * **Outpatient Care**: 10% Co-payment (limits depend on tier, e.g., Heza: 250K–450K RWF, Retail: 450K–1.12M RWF, Corporate: 375K–3.75M RWF)\n'
-             '  * *Geographic cover: Rwanda local, East African Community (EAC), and India on medical referral.*';
+    if (ins.contains('uap') || ins.contains('mutual')) {
+      return '  * **Inpatient Care:** 10% Co-payment (Old Mutual covers 90%)\n'
+             '  * **Outpatient Care:** 10% Co-payment — limits depend on plan tier';
+    } else if (ins.contains('radiant')) {
+      return '  * **Inpatient Care:** 15% Co-payment (Radiant covers 85%)\n'
+             '  * **Outpatient Care:** 15% Co-payment — check your policy annual limits';
+    } else if (ins.contains('mutuelle') || ins.contains('cbhi')) {
+      return '  * **Inpatient Care:** 10% Co-payment (CBHI covers 90%)\n'
+             '  * **Outpatient Care:** 10% Co-payment at referral hospitals; flat 200 RWF at health centers';
     } else {
-      return '  * **Inpatient Care**: 100% Patient Co-payment (Fully Out-of-pocket)\n'
-             '  * **Outpatient Care**: 100% Patient Co-payment (Fully Out-of-pocket)';
+      return '  * **Inpatient Care:** 100% out-of-pocket (no insurance)\n'
+             '  * **Outpatient Care:** 100% out-of-pocket (no insurance)';
     }
   }
 
-  /// Formats a single hospital into a clean markdown card string.
-  static String formatCard(CuratedHospital h, {int? rank, String? insurance, bool showInsuranceBadge = true}) {
+  /// Maps a detected condition keyword to the relevant service names.
+  static List<String> conditionToRelevantServices(String? condition) {
+    if (condition == null) return ['General Consultation'];
+    final c = condition.toLowerCase();
+
+    if (c.contains('dental') || c.contains('teeth') || c.contains('tooth') || c.contains('mouth')) {
+      return ['Specialist Consultation', 'Dental Cleaning / Filling'];
+    }
+    if (c.contains('mental') || c.contains('psych') || c.contains('depression') ||
+        c.contains('anxiety') || c.contains('stress') || c.contains('counsel')) {
+      return ['General Consultation', 'Specialist Consultation', 'Inpatient Admission'];
+    }
+    if (c.contains('matern') || c.contains('pregnan') || c.contains('birth') ||
+        c.contains('gynec') || c.contains('obstet')) {
+      return ['Specialist Consultation', 'Abdominal/Obstetric Ultrasound', 'Standard Maternity Delivery'];
+    }
+    if (c.contains('chest') || c.contains('heart') || c.contains('cardio') || c.contains('breath')) {
+      return ['General Consultation', 'Chest X-Ray', 'Specialist Consultation'];
+    }
+    if (c.contains('bone') || c.contains('fracture') || c.contains('joint') || c.contains('muscle')) {
+      return ['General Consultation', 'Specialist Consultation'];
+    }
+    if (c.contains('eye') || c.contains('vision') || c.contains('skin') || c.contains('rash')) {
+      return ['General Consultation', 'Specialist Consultation'];
+    }
+    if (c.contains('child') || c.contains('kid') || c.contains('pediatr')) {
+      return ['General Consultation', 'Specialist Consultation'];
+    }
+    if (c.contains('accident') || c.contains('injury') || c.contains('bleeding') || c.contains('wound')) {
+      return ['General Consultation', 'Inpatient Admission'];
+    }
+    if (c.contains('lab') || c.contains('diagnost') || c.contains('scan') ||
+        c.contains('test') || c.contains('x-ray')) {
+      return ['Full Blood Count', 'Chest X-Ray', 'Abdominal/Obstetric Ultrasound'];
+    }
+    // General: pain, fever, sick, headache, stomach, etc.
+    return ['General Consultation', 'Full Blood Count'];
+  }
+
+  /// Builds a [HospitalCostSummary] from a list of hospitals, filtered to
+  /// services relevant to [condition]. Used by the cost estimate UI widget.
+  static HospitalCostSummary buildCostSummary(
+    List<CuratedHospital> hospitals, {
+    required String insurance,
+    String? condition,
+    int maxShown = 3,
+  }) {
+    final relevantServices = conditionToRelevantServices(condition);
+    final ins = insurance.toLowerCase();
+
+    final cards = <HospitalCostCard>[];
+
+    for (final h in hospitals.take(maxShown)) {
+      final entries = <ServiceCostEntry>[];
+      int totalCopay = 0;
+
+      for (final serviceName in relevantServices) {
+        final basePrice = h.servicesPrices[serviceName];
+        if (basePrice == null) continue; // hospital doesn't offer this service
+        // Determine if this is an inpatient service
+        final serviceObj = services.firstWhere(
+          (s) => s.name == serviceName,
+          orElse: () => const MedicalService(name: '', isInpatient: false, description: ''),
+        );
+
+        final int copay;
+        final bool covered;
+        String? coverageNote;
+
+        if (ins.contains('britam')) {
+          if (serviceObj.isInpatient) {
+            copay = 0;
+            covered = true;
+            coverageNote = 'Britam covers inpatient (0% copay)';
+          } else {
+            copay = basePrice;
+            covered = false;
+            coverageNote = 'Outpatient excluded by Britam — full cost applies';
+          }
+        } else if (ins.contains('uap') || ins.contains('mutual')) {
+          copay = (basePrice * 0.10).round();
+          covered = true;
+          coverageNote = 'Old Mutual pays 90%';
+        } else if (ins.contains('mutuelle') || ins.contains('cbhi')) {
+          copay = (basePrice * 0.10).round();
+          covered = true;
+          coverageNote = 'Mutuelle de Santé covers 90%';
+        } else {
+          copay = basePrice;
+          covered = false;
+          coverageNote = 'No insurance — full cost applies';
+        }
+
+        totalCopay += copay;
+        entries.add(ServiceCostEntry(
+          serviceName: serviceName,
+          basePriceRwf: basePrice,
+          patientCopayRwf: copay,
+          insurancePaysRwf: basePrice - copay,
+          isCovered: covered,
+          coverageNote: coverageNote,
+        ));
+      }
+
+      if (entries.isNotEmpty) {
+        cards.add(HospitalCostCard(
+          hospitalName: h.name,
+          hospitalType: h.type,
+          distanceKm: h.distanceKm,
+          isInNetwork: h.acceptsInsurance(insurance),
+          phone: h.phone,
+          email: h.email,
+          services: entries,
+          totalEstimatedCopayRwf: totalCopay,
+        ));
+      }
+    }
+
+    // Sort cards by total estimated copay (cheapest first)
+    final sorted = [...cards]..sort((a, b) => a.totalEstimatedCopayRwf.compareTo(b.totalEstimatedCopayRwf));
+
+    return HospitalCostSummary(
+      insurance: insurance,
+      detectedCondition: condition,
+      hospitals: cards, // keep original ranking order in the list
+      cheapestHospitalName: sorted.isNotEmpty ? sorted.first.hospitalName : '',
+      lowestCopayRwf: sorted.isNotEmpty ? sorted.first.totalEstimatedCopayRwf : 0,
+    );
+  }
+
+  /// Formats an RWF integer into a comma-separated string (e.g. 12,000).
+  static String _formatPrice(int rwf) {
+    return rwf.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]},',
+    );
+  }
+
+  /// Builds a markdown price-breakdown section for condition-relevant services.
+  static String _buildPriceSection(
+    CuratedHospital h,
+    String insurance,
+    String? condition,
+  ) {
+    final relevantServices = conditionToRelevantServices(condition);
+    final ins = insurance.toLowerCase();
+    final lines = <String>[];
+
+    for (final serviceName in relevantServices) {
+      final price = h.servicesPrices[serviceName];
+      if (price == null) continue;
+
+      final serviceObj = services.firstWhere(
+        (s) => s.name == serviceName,
+        orElse: () =>
+            const MedicalService(name: '', isInpatient: false, description: ''),
+      );
+      final perDay = serviceObj.isInpatient ? '/day' : '';
+      final baseStr = '${_formatPrice(price)} RWF$perDay';
+
+      if (ins.contains('britam')) {
+        if (serviceObj.isInpatient) {
+          lines.add(
+            '- $serviceName (base: $baseStr) — **Free** *(inpatient, fully covered)*',
+          );
+        } else {
+          lines.add(
+            '- $serviceName (base: $baseStr) — **${_formatPrice(price)} RWF** *(outpatient excluded)*',
+          );
+        }
+      } else if (ins.contains('uap') || ins.contains('mutual')) {
+        final copay = (price * 0.10).round();
+        lines.add(
+          '- $serviceName (base: $baseStr) — **${_formatPrice(copay)} RWF** *(10% copay)*',
+        );
+      } else if (ins.contains('mutuelle') || ins.contains('cbhi')) {
+        final copay = (price * 0.10).round();
+        lines.add(
+          '- $serviceName (base: $baseStr) — **${_formatPrice(copay)} RWF** *(10% copay)*',
+        );
+      } else {
+        lines.add('- $serviceName — **$baseStr**');
+      }
+    }
+
+    if (lines.isEmpty) return '';
+    final header = insurance == 'None'
+        ? '**Service Prices (cash rates):**'
+        : '**Your Estimated Cost ($insurance):**';
+    return '$header\n${lines.join('\n')}';
+  }
+
+  /// Formats a single hospital into a clean markdown card (no emojis).
+  /// Pass [condition] to show only services relevant to the health query.
+  static String formatCard(
+    CuratedHospital h, {
+    int? rank,
+    String? insurance,
+    String? condition,
+    bool showInsuranceBadge = true,
+  }) {
     final rankPrefix = rank != null ? '### $rank. ' : '### ';
-    final inNetwork = insurance != null && insurance != 'None' && h.acceptsInsurance(insurance);
-    final networkBadge = showInsuranceBadge && insurance != null && insurance != 'None'
-        ? (inNetwork ? '✅ **In-Network**' : '⚠️ Out-of-Network')
-        : '';
+    final inNetwork =
+        insurance != null && insurance != 'None' && h.acceptsInsurance(insurance);
+    final networkStatus =
+        showInsuranceBadge && insurance != null && insurance != 'None'
+            ? (inNetwork ? '**In-Network**' : 'Out-of-Network')
+            : '';
 
     final buffer = StringBuffer();
     buffer.writeln('$rankPrefix${h.name}');
-    buffer.writeln('🏷️ *${h.type}*');
-    buffer.writeln('📍 **Location:** ${h.sector} — **${h.distanceKm} km from Masoro**');
-    if (networkBadge.isNotEmpty) buffer.writeln('🛡️ **Insurance:** $networkBadge');
-    
-    // Inject custom copay rules from policies MD dataset
+    buffer.writeln('*${h.type}* · ${h.sector} · ${h.distanceKm} km from Masoro');
+    if (networkStatus.isNotEmpty) buffer.writeln('**Insurance:** $networkStatus');
+
+    // Coverage rules (compact)
     if (insurance != null) {
-      buffer.writeln('💵 **Financial Co-payment & Coverage Rules:**');
+      buffer.writeln('**Coverage:**');
       buffer.writeln(getCopayInfo(insurance));
     }
-    
-    buffer.writeln('📞 **Phone:** ${h.phone}');
-    buffer.writeln('📧 **Email:** ${h.email}');
+
+    // Condition-relevant service prices
+    if (insurance != null) {
+      final priceSection = _buildPriceSection(h, insurance, condition);
+      if (priceSection.isNotEmpty) {
+        buffer.writeln();
+        buffer.writeln(priceSection);
+      }
+    }
+
+    buffer.writeln();
+    buffer.writeln('**Phone:** ${h.phone} · **Email:** ${h.email}');
     return buffer.toString();
   }
 
-  /// Formats a complete ranked list of hospitals into a markdown response.
+  /// Formats a complete ranked list of hospitals into a clean markdown response.
   static String formatList(
     List<CuratedHospital> hospitals, {
     String insurance = 'None',
@@ -446,30 +657,19 @@ class CuratedHospitals {
     int maxShown = 3,
   }) {
     if (hospitals.isEmpty) {
-      return '🏥 **No matching facilities found.**\n\n'
-          'We recommend visiting **Caraes Ndera Hospital** (+250 788 827 364) '
-          'or **Rwanda Military Hospital** (+250 252 586 420) for urgent care near Masoro.';
+      return 'No matching facilities found near Masoro.\n\n'
+          'We recommend contacting **Caraes Ndera Hospital** (+250 788 827 364) '
+          'or **Rwanda Military Hospital** (+250 252 586 420) for urgent care.';
     }
 
     final buffer = StringBuffer();
 
     if (conditionContext != null) {
-      buffer.writeln('🏥 **Recommended Facilities near Masoro for: "$conditionContext"**\n');
+      buffer.writeln('I found the following recommended facilities near Masoro for **$conditionContext**:');
     } else {
-      buffer.writeln('🏥 **Recommended Healthcare Facilities near Masoro**\n');
+      buffer.writeln('Here are the recommended healthcare facilities near Masoro:');
     }
 
-    if (insurance != 'None') {
-      buffer.writeln('Using your insurance plan: **$insurance** (all listed facilities accept Britam & UAP)\n');
-    }
-
-    final shown = hospitals.take(maxShown).toList();
-    for (var i = 0; i < shown.length; i++) {
-      buffer.writeln(formatCard(shown[i], rank: i + 1, insurance: insurance));
-      buffer.writeln('---');
-    }
-
-    buffer.writeln('\n> 💡 *Always call ahead to confirm availability before visiting.*');
     return buffer.toString();
   }
 }

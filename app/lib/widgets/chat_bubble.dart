@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import '../services/hospital_cost_model.dart';
+import 'hospital_carousel_widget.dart';
+import 'hospital_insight_widget.dart';
 
 // ─── Refined Dark Theme Design Tokens ────────────────────────────────────────
-const _kUserBubbleColor = Color(0xFF1E87D9); // Gorgeous solid blue for user messages
+const _kUserBubbleColor = Color(0xFF1E87D9); // Solid blue for user messages
 const _kUserTextColor = Color(0xFFFFFFFF);
 const _kAiTextColor = Color(0xE6FFFFFF); // Soft off-white for body text
-const _kAiLabelColor = Color(0xFF3BE2B0); // Soothing wellness mint for the "Gemma" tag
-const _kVioletColor = Color(0xFF926BFF); // Glowing violet for headings and bold texts
+const _kAiLabelColor = Color(0xFF3BE2B0); // Mint accent for the "Gemma" tag
 const _kBubbleRadius = 20.0;
 const _kTailRadius = 4.0;
 
@@ -20,6 +22,11 @@ class ChatBubble extends StatefulWidget {
   final bool isStreaming;
   final bool wasTruncated;
   final VoidCallback? onPlayAudio;
+  final HospitalCostSummary? costSummary;
+
+  final double? tokensPerSecond;
+  final int? generationTimeMs;
+  final bool showMetrics;
 
   const ChatBubble({
     super.key,
@@ -28,6 +35,10 @@ class ChatBubble extends StatefulWidget {
     this.isStreaming = false,
     this.wasTruncated = false,
     this.onPlayAudio,
+    this.costSummary,
+    this.tokensPerSecond,
+    this.generationTimeMs,
+    this.showMetrics = false,
   });
 
   @override
@@ -180,6 +191,50 @@ class _ChatBubbleState extends State<ChatBubble>
                     ),
                   ),
                 ],
+                // Cost estimate widget — shown below AI hospital responses
+                if (!widget.isUser &&
+                    !widget.isStreaming &&
+                    widget.costSummary != null &&
+                    widget.costSummary!.hospitals.isNotEmpty)
+                  SelectionContainer.disabled(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                         HospitalCarouselWidget(summary: widget.costSummary!),
+                        HospitalInsightWidget(summary: widget.costSummary!),
+                      ],
+                    ),
+                  ),
+                // Stats pill — shown if enabled and available
+                if (!widget.isUser &&
+                    !widget.isStreaming &&
+                    widget.showMetrics &&
+                    widget.tokensPerSecond != null &&
+                    widget.generationTimeMs != null)
+                  SelectionContainer.disabled(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 8.0, bottom: 2.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.speed_rounded,
+                            size: 11,
+                            color: _kAiLabelColor.withValues(alpha: 0.6),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${widget.tokensPerSecond!.toStringAsFixed(1)} tokens/sec · ${(widget.generationTimeMs! / 1000).toStringAsFixed(2)}s',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -252,7 +307,7 @@ class _BubbleTextState extends State<_BubbleText>
       );
     }
 
-    // AI Markdown Style Sheet - custom colors for headings, bold elements, & lists
+    // AI Markdown Style Sheet — white headings, mint accents, no purple
     final markdownStyle = MarkdownStyleSheet(
       p: TextStyle(
         color: baseColor,
@@ -260,20 +315,35 @@ class _BubbleTextState extends State<_BubbleText>
         height: 1.55,
       ),
       strong: const TextStyle(
-        color: _kVioletColor, // Glowing violet for bold elements/titles!
-        fontWeight: FontWeight.w800,
+        color: Colors.white,
+        fontWeight: FontWeight.w700,
       ),
       em: const TextStyle(
-        color: Color(0xFFE2B0FF), // Soft lavender for italics
+        color: Color(0xFFB0C4CC), // muted blue-grey for italics
         fontStyle: FontStyle.italic,
       ),
       listBullet: const TextStyle(
-        color: _kAiLabelColor, // Glowing mint for bullet lists!
+        color: _kAiLabelColor,
         fontWeight: FontWeight.bold,
       ),
-      h1: const TextStyle(color: _kVioletColor, fontSize: 20, fontWeight: FontWeight.bold, height: 1.4),
-      h2: const TextStyle(color: _kVioletColor, fontSize: 18, fontWeight: FontWeight.bold, height: 1.4),
-      h3: const TextStyle(color: _kAiLabelColor, fontSize: 16, fontWeight: FontWeight.bold, height: 1.4),
+      h1: const TextStyle(
+        color: Colors.white,
+        fontSize: 18,
+        fontWeight: FontWeight.w800,
+        height: 1.4,
+      ),
+      h2: const TextStyle(
+        color: Colors.white,
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        height: 1.4,
+      ),
+      h3: const TextStyle(
+        color: _kAiLabelColor,
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+        height: 1.4,
+      ),
       listBulletPadding: const EdgeInsets.only(right: 6, top: 2),
       blockquoteDecoration: BoxDecoration(
         color: Colors.white10,

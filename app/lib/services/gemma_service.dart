@@ -6,7 +6,7 @@ import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:path_provider/path_provider.dart';
 import 'database_helper.dart';
 import 'clinic_insurance_tool.dart';
-import 'curated_hospitals.dart';
+import 'hospital_cost_model.dart';
 
 /// Manages Gemma model lifecycle: download, initialization, inference.
 ///
@@ -39,12 +39,19 @@ class GemmaService extends ChangeNotifier {
   final Stopwatch _generationStopwatch = Stopwatch();
   bool _lastGenerationTruncated = false;
 
+  // Cost summary from the last hospital query (null if the last message was not a hospital query)
+  HospitalCostSummary? _lastCostSummary;
+
   GemmaServiceState get state => _state;
   double get downloadProgress => _downloadProgress;
   String? get error => _error;
   bool get isReady => _state == GemmaServiceState.ready;
   bool get isGenerating => _state == GemmaServiceState.generating;
   int get tokensGenerated => _tokensGenerated;
+
+  /// The structured cost breakdown from the last hospital-query response.
+  /// Null when the last message was not a hospital/condition query.
+  HospitalCostSummary? get lastHospitalCostSummary => _lastCostSummary;
 
   /// True if the most recent generation hit [_maxGenerationTokens] before
   /// the model emitted EOS. Consumers can surface a truncation hint to the
@@ -377,73 +384,10 @@ class GemmaService extends ChangeNotifier {
         return;
       }
 
-      // ─── 2–4. ALL HOSPITAL / CONDITION / INSURANCE QUERIES ─────────────────
-      // These ALL route exclusively to the curated list of 10 Masoro-area
-      // facilities. No Firestore lookup, no medication advice.
-      final bool isHospitalQuery =
-          lowerText.contains('hospital') ||
-          lowerText.contains('clinic') ||
-          lowerText.contains('doctor') ||
-          lowerText.contains('where') ||
-          lowerText.contains('emergency') ||
-          lowerText.contains('insurance') ||
-          lowerText.contains('near') ||
-          lowerText.contains('close') ||
-          lowerText.contains('nearest') ||
-          lowerText.contains('recommend') ||
-          lowerText.contains('facility') ||
-          lowerText.contains('treat') ||
-          lowerText.contains('er') ||
-          lowerText.contains('refer');
-
-      // Condition keywords that should trigger a facility recommendation
-      const conditionKeywords = [
-        'dental', 'teeth', 'tooth', 'mouth',
-        'mental', 'psych', 'depression', 'anxiety', 'stress', 'counsel',
-        'matern', 'pregnan', 'birth', 'gynec', 'obstet',
-        'chest', 'heart', 'cardio', 'breath',
-        'bone', 'fracture', 'joint', 'muscle',
-        'eye', 'vision', 'skin', 'rash',
-        'child', 'kid', 'pediatr',
-        'accident', 'injury', 'bleeding', 'wound',
-        'lab', 'diagnost', 'scan', 'test', 'x-ray',
-        'pain', 'fever', 'sick', 'ill', 'feeling',
-        'headache', 'stomach', 'diarrhea', 'vomit',
-      ];
-
-      String? detectedCondition;
-      for (final kw in conditionKeywords) {
-        if (lowerText.contains(kw)) {
-          detectedCondition = kw;
-          break;
-        }
-      }
-
-      if (isHospitalQuery || detectedCondition != null) {
-        final insurance = await DatabaseHelper.instance
-            .getProfileValue('insurance', defaultValue: 'None');
-
-        List<CuratedHospital> hospitals;
-        String? conditionContext;
-
-        if (detectedCondition != null) {
-          hospitals = CuratedHospitals.forCondition(detectedCondition);
-          conditionContext = detectedCondition;
-        } else {
-          hospitals = CuratedHospitals.forInsurance(insurance);
-        }
-
-        final response = CuratedHospitals.formatList(
-          hospitals,
-          insurance: insurance,
-          conditionContext: conditionContext,
-          maxShown: 3,
-        );
-        yield* _streamWords(response, delayMs: 15);
-        return;
-      }
 
       // ─── 5. GENERAL ON-DEVICE INFERENCE (hospital-guidance framing) ─────
+      // Clear cost summary for non-hospital queries
+      _lastCostSummary = null;
       bool isFirstMessage = true;
       if (activeConversationId != null) {
         final messages = await DatabaseHelper.instance.getMessages(activeConversationId);
@@ -453,6 +397,28 @@ class GemmaService extends ChangeNotifier {
       String prompt = text;
       if (isFirstMessage) {
         final profileSummary = await DatabaseHelper.instance.generateStudentProfileSummary();
+        final insurance = await DatabaseHelper.instance.getProfileValue('insurance', defaultValue: 'None');
+        final cleanIns = insurance.toLowerCase();
+        String insuranceRules = '';
+        String insuranceRuleShort = '';
+
+        if (cleanIns.contains('britam')) {
+          insuranceRules = '- Britam: Outpatient services (Consultations, Lab, Dental, Ultrasound, X-Ray) are EXCLUDED (100% patient copay applies). Inpatient services (Inpatient Admission, Standard Maternity Delivery) have 0% copay (fully covered).';
+          insuranceRuleShort = '* Britam: out-of-pocket for consultations/lab/dental/scans; free (0 RWF) for inpatient/maternity admission.';
+        } else if (cleanIns.contains('uap') || cleanIns.contains('mutual')) {
+          insuranceRules = '- Old Mutual (UAP): 10% co-payment (90% covered) for all inpatient and outpatient services.';
+          insuranceRuleShort = '* Old Mutual: 10% of cash price.';
+        } else if (cleanIns.contains('mutuelle') || cleanIns.contains('cbhi')) {
+          insuranceRules = '- Mutuelle de Santé (CBHI): 10% co-payment (90% covered) for all services.';
+          insuranceRuleShort = '* Mutuelle: 10% of cash price.';
+        } else if (cleanIns.contains('none')) {
+          insuranceRules = '- None (No Insurance): 100% patient copay (fully out-of-pocket).';
+          insuranceRuleShort = '* None: full cash price.';
+        } else {
+          insuranceRules = '- Active Insurance Plan ($insurance): Outpatient/Inpatient coverage rules are specified in the Student Background contract summary.';
+          insuranceRuleShort = '* $insurance: refer to the contract summary.';
+        }
+
         prompt = '''[SYSTEM DIRECTION — READ CAREFULLY AND FOLLOW STRICTLY:
 
 You are a Student Hospital Navigation & Price Comparison Guide for students near Masoro, Kigali, Rwanda.
@@ -511,26 +477,23 @@ APPROVED FACILITY & PRICE LIST (Uninsured / Base Cash Rates):
    - Chest X-Ray: 8,000 RWF
    - Inpatient Admission: 10,000 RWF/day
 
-CO-PAYMENT & INSURANCE COVERAGE RULES (dataset/rwanda_insurance_financial_policies.md):
-- Britam: Outpatient services (Consultations, Lab, Dental, Ultrasound, X-Ray) are EXCLUDED (100% patient copay applies). Inpatient services (Inpatient Admission, Standard Maternity Delivery) have 0% copay (fully covered).
-- Old Mutual (UAP): 10% co-payment (90% covered) for all inpatient and outpatient services.
-- None (No Insurance): 100% patient copay (fully out-of-pocket).
+CO-PAYMENT & INSURANCE COVERAGE RULES:
+$insuranceRules
 
 RULES:
 - RECOMMEND EXACTLY THREE (3) FACILITIES from the list.
-- When asked about prices, compare the copayment the student will owe based on their active plan:
-  * Britam: out-of-pocket for consultations/lab/dental/scans; free (0 RWF) for inpatient/maternity admission.
-  * Old Mutual: 10% of cash price.
-  * None: full cash price.
+- When asked about prices, calculate the copayment the student will owe based on their active plan:
+  $insuranceRuleShort
+- ACTIVE INSURANCE RESTRICTION (CRITICAL): You must ONLY refer to, discuss, explain, or evaluate the student's active insurance plan ($insurance). Do NOT list, discuss, mention, compare, or explain any other insurance policies, rules, or copays under any circumstances, even if the student explicitly asks about other insurance providers in their question. Focus your advice entirely on the student's active plan ($insurance).
 - NEVER suggest any medication, drug, or treatment by name.
 - Keep your response warm, clear, and concise.
 - Always remind the student you are a navigation guide, not a medical professional.
+- SPECIAL INTERFACE DISPLAY TRIGGER (CRITICAL RULE): You MUST ONLY append the special tag `[SHOW_HOSPITALS: <condition>]` at the very end of your response if the student's query is explicitly seeking to locate, search, list, recommend, or compare specific physical hospital facilities or clinics near Masoro (or asking which clinic to go to for symptoms/treatments). If they are asking general, policy, theoretical, or informational questions (such as explaining what a co-pay is, general wellness advice, helpline numbers, or asking you to explain an insurance policy), you MUST NOT append the `[SHOW_HOSPITALS: ...]` tag under any circumstances.
 
 Student Background: $profileSummary]
 
 Student Question: $text''';
       }
-
       final Message message;
       if (imageBytes != null && imageBytes.isNotEmpty) {
         message = Message.withImages(text: prompt, imageBytes: imageBytes, isUser: true);
@@ -603,6 +566,9 @@ Student Question: $text''';
     if (_generationStopwatch.elapsedMilliseconds == 0) return 0;
     return _tokensGenerated / (_generationStopwatch.elapsedMilliseconds / 1000);
   }
+
+  /// Total time in milliseconds from the last generation.
+  int get generationTimeMs => _generationStopwatch.elapsedMilliseconds;
 
 
 

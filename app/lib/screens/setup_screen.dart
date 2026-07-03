@@ -10,6 +10,7 @@ import 'package:read_pdf_text/read_pdf_text.dart';
 
 import '../services/gemma_service.dart';
 import '../services/database_helper.dart';
+import '../services/hospital_repository.dart';
 import '../widgets/vector_robot.dart';
 import '../widgets/holographic_sphere.dart';
 
@@ -114,6 +115,15 @@ class _SetupScreenState extends State<SetupScreen> {
       if (!mounted) return;
       setState(() => _statusMessage = 'Warming up AI engine on device...');
       await widget.gemmaService.loadModel();
+
+      // Step 2.5: Sync hospital database from Firestore
+      if (!mounted) return;
+      setState(() => _statusMessage = 'Syncing hospital directories...');
+      try {
+        await HospitalRepository.instance.syncFromFirestore();
+      } catch (e) {
+        debugPrint('SetupScreen: Hospital sync failed: $e');
+      }
 
       // Step 3: Analyze uploaded contract if present
       final db = DatabaseHelper.instance;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'services/gemma_service.dart';
 import 'services/performance_monitor.dart';
@@ -6,8 +7,15 @@ import 'screens/setup_screen.dart';
 import 'screens/chat_screen.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await Firebase.initializeApp();
+    debugPrint("Firebase initialized successfully.");
+  } catch (e) {
+    debugPrint("Firebase initialization failed (expected if config is missing): $e");
+  }
 
   // Framework init is deferred to SetupScreen so any failure surfaces through
   // the normal retry UI rather than crashing to a black screen pre-runApp.
