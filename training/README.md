@@ -72,6 +72,8 @@ After post-train eval, artifacts are written per tier under `training/results/re
 
 **Failure classes:** `wrong_first_tool`, `wrong_pipeline`, `wrong_insurance_arg`, `stopped_early`, `skipped_rank`, `no_tool_call`, `hallucinated_tool`
 
+For diagram drafting before a real run, use [`simulate_eval_outputs.py`](simulate_eval_outputs.py) to generate mock comparison tables, per-case traces, and chart files from `dataset/ranga_output/ranga_eval_20.csv`.
+
 ## Export gate (E2B notebook only)
 
 Before `.litertlm` export, the notebook checks:

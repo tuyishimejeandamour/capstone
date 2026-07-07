@@ -122,7 +122,7 @@ class CostBreakdownSheet extends StatelessWidget {
                         _Badge(
                           label: insurance == 'None' ? 'No Insurance' : insurance,
                           color: insurance == 'None'
-                              ? const Color(0xFFE56B6B)
+                              ? const Color(0xFFFFD580)
                               : _kInsuranceBadgeColor,
                           icon: Icons.shield_outlined,
                         ),
@@ -607,7 +607,7 @@ class _ServiceRow extends StatelessWidget {
                           entry.coverageNote!,
                           style: TextStyle(
                             color: excluded
-                                ? const Color(0xFFE56B6B).withValues(alpha: 0.8)
+                                ? const Color(0xFFFFD580).withValues(alpha: 0.8)
                                 : _kAccentColor.withValues(alpha: 0.6),
                             fontSize: 9,
                             fontStyle: FontStyle.italic,
@@ -665,9 +665,7 @@ class _ServiceRow extends StatelessWidget {
                   style: TextStyle(
                     color: entry.patientCopayRwf == 0
                         ? _kAccentColor
-                        : excluded
-                            ? const Color(0xFFE56B6B)
-                            : const Color(0xFFFFD580),
+                        : const Color(0xFFFFD580),
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),

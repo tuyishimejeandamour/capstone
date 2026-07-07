@@ -913,11 +913,11 @@ class _EmptyState extends StatelessWidget {
             childAspectRatio: 1.15,
             children: [
               _buildDashboardCard(
-                icon: Icons.local_hospital_outlined,
-                title: 'Clinic & Emergency',
-                subtitle: 'Get quick numbers for campus clinic & emergency hotlines.',
+                icon: Icons.spa_outlined,
+                title: 'Wellness & Support',
+                subtitle: 'ALU Wellness office, local clinics, and emergency contacts.',
                 color: _kAccentColor,
-                onTap: () => onCardTap('What are the emergency health contacts for ALU students?'),
+                onTap: () => onCardTap('What wellness and emergency resources are available for ALU students?'),
               ).animate().scale(delay: 350.ms, curve: Curves.easeOutBack),
               _buildDashboardCard(
                 icon: Icons.health_and_safety_outlined,

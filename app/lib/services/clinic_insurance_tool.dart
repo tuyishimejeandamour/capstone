@@ -1,16 +1,19 @@
 class ClinicInsuranceTool {
-  static const Map<String, dynamic> clinicInfo = {
-    'name': 'University of Rwanda Student Health Clinic',
+  static const Map<String, dynamic> wellnessInfo = {
+    'name': 'ALU Masoro Campus Wellness & Support Resources',
     'location':
-        'Gikondo Campus, Kigali, Rwanda (Adjacent to the Main Library)',
-    'general_hours':
-        'Monday - Friday: 8:00 AM - 5:00 PM\nSaturday: 9:00 AM - 12:00 PM\nSunday: Closed',
-    'phone': '+250 788 123 456',
-    'counseling':
-        'Student Mental Health Support: Free walk-in counseling Monday - Friday, 10:00 AM - 4:00 PM.',
+        'ALU Masoro Campus, Kigali, Rwanda (Health & Wellness Office, Ground Floor)',
+    'alu_support':
+        'ALU Wellness Coordinator: Dedicated mental health support and counseling. Walk-in or email studentwellness@alueducation.com.',
+    'wellness_hours':
+        'Monday - Friday: 9:00 AM - 5:00 PM',
+    'nearest_health_centers':
+        '- Ndera Health Center (CS Ndera): Local public clinic for primary care | ~1.5 km | +250 788 888 888\n'
+        '- Kabuga Health Center: Public clinic | ~5.0 km\n'
+        '- Masoro Community Pharmacy: 24/7 nearest pharmacy | Masoro Commercial Center | +250 788 999 999',
     'crisis_line': 'Rwanda National Emergency Line (24/7): 112 / Suicide Prevention: 114',
     'next_steps':
-        'For minor symptoms, rest, hydrate, and visit the Gikondo Clinic. For severe issues, visit CHUK ER.',
+        'Note that ALU does not have an active on-campus clinic. For minor health concerns, visit the ALU Wellness Office or the nearest Ndera Health Center. For emergencies, call 112 or visit Rwanda Military Hospital (RMH) ER.',
   };
 
   static const Map<String, Map<String, String>> insuranceNetworks = {
@@ -65,14 +68,15 @@ class ClinicInsuranceTool {
     },
   };
 
-  /// Returns clinic details as a formatted text block.
+  /// Returns ALU Wellness and local Masoro support details as a formatted text block.
   static String getClinicHoursText() {
-    return '🏥 **${clinicInfo['name']}**\n'
-        '📍 **Location:** ${clinicInfo['location']}\n'
-        '⏰ **Hours:**\n${clinicInfo['general_hours']}\n'
-        '📞 **Phone:** ${clinicInfo['phone']}\n'
-        '🧠 **Counseling:** ${clinicInfo['counseling']}\n'
-        '🚨 **24/7 Crisis Hotline:** ${clinicInfo['crisis_line']}';
+    return '🏥 **${wellnessInfo['name']}**\n'
+        '📍 **Office:** ${wellnessInfo['location']}\n'
+        '⏰ **Office Hours:** ${wellnessInfo['wellness_hours']}\n'
+        '🧠 **ALU Wellness & Counseling:** ${wellnessInfo['alu_support']}\n\n'
+        '💊 **Nearest Local Care & Pharmacy:**\n${wellnessInfo['nearest_health_centers']}\n\n'
+        '🚨 **24/7 Emergency Hotlines:** ${wellnessInfo['crisis_line']}\n'
+        '📝 **Important Note & Next Steps:** ${wellnessInfo['next_steps']}';
   }
 
   /// Finds and formats hospital recommendations based on the student's insurance plan.
