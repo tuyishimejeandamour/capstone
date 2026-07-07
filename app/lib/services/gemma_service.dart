@@ -369,16 +369,21 @@ class GemmaService extends ChangeNotifier {
     try {
       final lowerText = text.toLowerCase();
 
-      // ─── 1. CLINIC HOURS / COUNSELING / CRISIS ─────────────────────────────
-      if (lowerText.contains('clinic') &&
-          (lowerText.contains('hour') ||
-              lowerText.contains('phone') ||
-              lowerText.contains('open') ||
-              lowerText.contains('time') ||
-              lowerText.contains('contact') ||
-              lowerText.contains('counseling') ||
-              lowerText.contains('hotline') ||
-              lowerText.contains('crisis'))) {
+      // ─── 1. WELLNESS / CLINIC / COUNSELING / CRISIS / EMERGENCY ─────────────
+      if (lowerText.contains('wellness') ||
+          lowerText.contains('counseling') ||
+          lowerText.contains('hotline') ||
+          lowerText.contains('crisis') ||
+          lowerText.contains('first aid') ||
+          lowerText.contains('emergency contact') ||
+          (lowerText.contains('clinic') &&
+              (lowerText.contains('hour') ||
+                  lowerText.contains('phone') ||
+                  lowerText.contains('open') ||
+                  lowerText.contains('time') ||
+                  lowerText.contains('contact') ||
+                  lowerText.contains('wellness') ||
+                  lowerText.contains('support')))) {
         final response = ClinicInsuranceTool.getClinicHoursText();
         yield* _streamWords(response, delayMs: 20);
         return;
@@ -502,6 +507,7 @@ Student Question: $text''';
       }
       await _chat!.addQuery(message);
 
+      String generatedText = '';
       await for (final response in _chat!.generateChatResponseAsync()) {
         if (response is TextResponse) {
           _tokensGenerated++;
@@ -511,6 +517,33 @@ Student Question: $text''';
             await _chat!.stopGeneration();
             _lastGenerationTruncated = true;
             yield response.token;
+            break;
+          }
+
+          generatedText += response.token;
+          if (_detectRepetition(generatedText)) {
+            debugPrint('⚠️ GemmaService: Repetition loop detected! Stopping and reloading model. Generated text: "$generatedText"');
+            await _chat!.stopGeneration();
+            
+            // Re-release memory and set to uninitialized
+            _chat?.close();
+            _model?.close();
+            _chat = null;
+            _model = null;
+            _state = GemmaServiceState.uninitialized;
+            notifyListeners();
+            
+            // Asynchronously reload the model to avoid blocking this stream's close
+            Future.microtask(() async {
+              try {
+                await loadModel();
+                debugPrint('✅ GemmaService: Model reloaded successfully after repetition loop.');
+              } catch (e) {
+                debugPrint('❌ GemmaService: Failed to reload model: $e');
+              }
+            });
+            
+            yield '\n\n[Repetition loop detected. AI model is reloading...]';
             break;
           }
 
@@ -570,7 +603,80 @@ Student Question: $text''';
   /// Total time in milliseconds from the last generation.
   int get generationTimeMs => _generationStopwatch.elapsedMilliseconds;
 
+  /// Detects if the generated text contains repetition loops (single words, phrases, or character-level).
+  bool _detectRepetition(String text) {
+    if (text.isEmpty) return false;
+    
+    // Character level repetition check (e.g. continuous dots, dashes, spaces, etc.)
+    if (text.length >= 20) {
+      final lastChars = text.substring(text.length - 20);
+      final firstChar = lastChars[0];
+      if (lastChars.split('').every((c) => c == firstChar)) {
+        return true;
+      }
+    }
 
+    final words = text.toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .toList();
+        
+    if (words.length < 8) return false;
+
+    // 1. Check for single word repetition (consecutive same words, e.g., "the the the the the the")
+    int consecutiveSame = 1;
+    for (int i = words.length - 1; i > 0; i--) {
+      if (words[i] == words[i - 1]) {
+        consecutiveSame++;
+        if (consecutiveSame >= 6) {
+          return true;
+        }
+      } else {
+        break;
+      }
+    }
+
+    // 2. Check for short sequence repetition (2-8 words repeated 3 times at the end)
+    for (int len = 2; len <= 8; len++) {
+      if (words.length < len * 3) continue;
+      
+      bool match = true;
+      final chunk1 = words.sublist(words.length - len);
+      final chunk2 = words.sublist(words.length - 2 * len, words.length - len);
+      final chunk3 = words.sublist(words.length - 3 * len, words.length - 2 * len);
+      
+      for (int i = 0; i < len; i++) {
+        if (chunk1[i] != chunk2[i] || chunk2[i] != chunk3[i]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) {
+        return true;
+      }
+    }
+
+    // 3. Check for larger sequence repetition (9-24 words repeated twice at the end)
+    for (int len = 9; len <= 24; len++) {
+      if (words.length < len * 2) continue;
+      
+      bool match = true;
+      final chunk1 = words.sublist(words.length - len);
+      final chunk2 = words.sublist(words.length - 2 * len, words.length - len);
+      
+      for (int i = 0; i < len; i++) {
+        if (chunk1[i] != chunk2[i]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 
   @override
   void dispose() {

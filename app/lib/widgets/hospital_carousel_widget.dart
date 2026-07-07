@@ -149,7 +149,7 @@ class HospitalCarouselWidget extends StatelessWidget {
                             label: h.isInNetwork ? 'In-Network' : 'Out-of-Network',
                             color: h.isInNetwork
                                 ? _kInsuranceBadgeColor
-                                : const Color(0xFFE56B6B),
+                                : const Color(0xFFFFD580),
                             icon: Icons.shield_outlined,
                           ),
                         ],
