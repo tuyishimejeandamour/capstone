@@ -431,6 +431,21 @@ class RangaService extends ChangeNotifier {
                   lowerText.contains('contact') ||
                   lowerText.contains('wellness') ||
                   lowerText.contains('support')))) {
+      // ─── 1. WELLNESS / CLINIC / COUNSELING / CRISIS / EMERGENCY ─────────────
+      if (lowerText.contains('wellness') ||
+          lowerText.contains('counseling') ||
+          lowerText.contains('hotline') ||
+          lowerText.contains('crisis') ||
+          lowerText.contains('first aid') ||
+          lowerText.contains('emergency contact') ||
+          (lowerText.contains('clinic') &&
+              (lowerText.contains('hour') ||
+                  lowerText.contains('phone') ||
+                  lowerText.contains('open') ||
+                  lowerText.contains('time') ||
+                  lowerText.contains('contact') ||
+                  lowerText.contains('wellness') ||
+                  lowerText.contains('support')))) {
         final response = ClinicInsuranceTool.getClinicHoursText();
         yield* _streamWords(response, delayMs: 20);
         return;
@@ -570,6 +585,7 @@ Student Question: $text''';
       }
       await _chat!.addQuery(message);
 
+      String generatedText = '';
       String generatedText = '';
       await for (final response in _chat!.generateChatResponseAsync()) {
         if (response is TextResponse) {
