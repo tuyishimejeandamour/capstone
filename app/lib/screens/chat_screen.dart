@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import '../services/gemma_service.dart';
+import '../services/ranga_service.dart';
 import '../services/performance_monitor.dart';
 import '../services/database_helper.dart';
 import '../services/speech_service.dart';

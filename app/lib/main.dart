@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
-import 'services/gemma_service.dart';
+import 'services/ranga_service.dart';
 import 'services/performance_monitor.dart';
 import 'screens/setup_screen.dart';
 import 'screens/chat_screen.dart';

@@ -8,7 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:read_pdf_text/read_pdf_text.dart';
 
-import '../services/gemma_service.dart';
+import '../services/ranga_service.dart';
 import '../services/database_helper.dart';
 import '../services/hospital_repository.dart';
 import '../widgets/vector_robot.dart';
