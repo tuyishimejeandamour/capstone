@@ -14,11 +14,11 @@ import 'hospital_cost_model.dart';
 /// - Android: Gemma 4 E2B (.litertlm, 2.4 GB) via LiteRT-LM
 /// - iOS: Gemma 3 1B IT (.task, 0.5 GB) via MediaPipe
 ///   (.litertlm crashes on iOS — Metal GPU delegate not supported yet)
-class GemmaService extends ChangeNotifier {
+class RangaService extends ChangeNotifier {
   // Gemma 4 E2B via LiteRT-LM — public, no HuggingFace auth needed.
   // Android only. iOS support pending Google's LiteRT-LM Swift API.
   static const String _modelUrl =
-      'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm';
+      'https://huggingface.co/tuyishimejeand/ranga/resolve/main/ranga.litertlm';
 
   static const int _maxTokens = 2048;
   static const int _maxGenerationTokens = 512;
@@ -26,9 +26,9 @@ class GemmaService extends ChangeNotifier {
   InferenceModel? _model;
   InferenceChat? _chat;
 
-  GemmaService();
+  RangaService();
 
-  GemmaServiceState _state = GemmaServiceState.uninitialized;
+  RangaServiceState _state = RangaServiceState.uninitialized;
   double _downloadProgress = 0.0;
   String? _error;
   bool _frameworkInitialized = false;
@@ -42,11 +42,11 @@ class GemmaService extends ChangeNotifier {
   // Cost summary from the last hospital query (null if the last message was not a hospital query)
   HospitalCostSummary? _lastCostSummary;
 
-  GemmaServiceState get state => _state;
+  RangaServiceState get state => _state;
   double get downloadProgress => _downloadProgress;
   String? get error => _error;
-  bool get isReady => _state == GemmaServiceState.ready;
-  bool get isGenerating => _state == GemmaServiceState.generating;
+  bool get isReady => _state == RangaServiceState.ready;
+  bool get isGenerating => _state == RangaServiceState.generating;
   int get tokensGenerated => _tokensGenerated;
 
   /// The structured cost breakdown from the last hospital-query response.
@@ -75,35 +75,39 @@ class GemmaService extends ChangeNotifier {
     if (FlutterGemma.hasActiveModel()) {
       return true;
     }
-    
+
     // Check if the model file is already present on disk in applicationDocumentsDirectory.
     // Minimum size = 2.3 GB. The full Gemma 4 E2B is ~2.59 GB.
     // Anything below this threshold is a partial or corrupted download.
     const int minimumValidSizeBytes = 2300 * 1024 * 1024; // 2.3 GB
     final docsDir = await getApplicationDocumentsDirectory();
     final modelFile = File('${docsDir.path}/gemma-model.litertlm');
-    
+
     if (await modelFile.exists()) {
       final fileSize = await modelFile.length();
       if (fileSize < minimumValidSizeBytes) {
-        debugPrint('⚠️ GemmaService: Model file too small (${ (fileSize / 1e9).toStringAsFixed(2)} GB < 2.3 GB minimum). Treating as incomplete.');
+        debugPrint(
+          '⚠️ GemmaService: Model file too small (${(fileSize / 1e9).toStringAsFixed(2)} GB < 2.3 GB minimum). Treating as incomplete.',
+        );
         return false;
       }
-      debugPrint('📡 GemmaService: Model file found on disk (${(fileSize / 1e9).toStringAsFixed(2)} GB). Registering as active...');
+      debugPrint(
+        '📡 GemmaService: Model file found on disk (${(fileSize / 1e9).toStringAsFixed(2)} GB). Registering as active...',
+      );
       try {
         await FlutterGemma.installModel(
           modelType: ModelType.gemmaIt,
           fileType: ModelFileType.litertlm,
-        )
-            .fromFile(modelFile.path)
-            .install();
+        ).fromFile(modelFile.path).install();
         return true;
       } catch (e) {
-        debugPrint('⚠️ GemmaService: Failed to register existing model file: $e');
+        debugPrint(
+          '⚠️ GemmaService: Failed to register existing model file: $e',
+        );
         return false;
       }
     }
-    
+
     return false;
   }
 
@@ -113,20 +117,22 @@ class GemmaService extends ChangeNotifier {
   /// resumes directly from the existing file byte offset on every retry.
   Future<void> downloadModel() async {
     if (_downloadFuture != null) {
-      debugPrint('📡 GemmaService: Download is already running. Waiting for completion...');
+      debugPrint(
+        '📡 GemmaService: Download is already running. Waiting for completion...',
+      );
       await _downloadFuture;
       return;
     }
 
-    if (_state == GemmaServiceState.loading ||
-        _state == GemmaServiceState.generating) {
+    if (_state == RangaServiceState.loading ||
+        _state == RangaServiceState.generating) {
       throw StateError('Cannot start download while ${_state.name}.');
     }
 
     final completer = Completer<void>();
     _downloadFuture = completer.future;
 
-    _state = GemmaServiceState.downloading;
+    _state = RangaServiceState.downloading;
     _error = null;
     notifyListeners();
 
@@ -137,15 +143,13 @@ class GemmaService extends ChangeNotifier {
       await FlutterGemma.installModel(
         modelType: ModelType.gemmaIt,
         fileType: ModelFileType.litertlm,
-      )
-          .fromFile(absolutePath)
-          .install();
+      ).fromFile(absolutePath).install();
 
-      _state = GemmaServiceState.downloaded;
+      _state = RangaServiceState.downloaded;
       notifyListeners();
       completer.complete();
     } catch (e) {
-      _state = GemmaServiceState.error;
+      _state = RangaServiceState.error;
       _error = 'Download failed: $e';
       notifyListeners();
       completer.completeError(e);
@@ -181,21 +185,29 @@ class GemmaService extends ChangeNotifier {
         req.headers.set(HttpHeaders.userAgentHeader, 'GemmaStudentApp/1.0');
         final res = await req.close();
         totalBytes = res.contentLength;
-        debugPrint('📡 Resume downloader: Total size = ${(totalBytes / 1e9).toStringAsFixed(2)} GB');
+        debugPrint(
+          '📡 Resume downloader: Total size = ${(totalBytes / 1e9).toStringAsFixed(2)} GB',
+        );
       } finally {
         client.close();
       }
     }
 
     for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-      final existingBytes = await tempFile.exists() ? await tempFile.length() : 0;
+      final existingBytes = await tempFile.exists()
+          ? await tempFile.length()
+          : 0;
 
       if (totalBytes > 0 && existingBytes >= totalBytes) {
-        debugPrint('📡 Resume downloader: File already fully downloaded ($existingBytes bytes).');
+        debugPrint(
+          '📡 Resume downloader: File already fully downloaded ($existingBytes bytes).',
+        );
         return tempFile.path;
       }
 
-      debugPrint('📡 Resume downloader: Attempt $attempt/$maxAttempts — resuming from ${(existingBytes / 1e6).toStringAsFixed(1)} MB');
+      debugPrint(
+        '📡 Resume downloader: Attempt $attempt/$maxAttempts — resuming from ${(existingBytes / 1e6).toStringAsFixed(1)} MB',
+      );
 
       final client = HttpClient()
         ..connectionTimeout = const Duration(minutes: 5)
@@ -206,7 +218,9 @@ class GemmaService extends ChangeNotifier {
         req.headers.set(HttpHeaders.userAgentHeader, 'GemmaStudentApp/1.0');
         if (existingBytes > 0) {
           req.headers.set(HttpHeaders.rangeHeader, 'bytes=$existingBytes-');
-          debugPrint('📡 Resume downloader: Sending Range: bytes=$existingBytes-');
+          debugPrint(
+            '📡 Resume downloader: Sending Range: bytes=$existingBytes-',
+          );
         }
 
         final res = await req.close();
@@ -217,11 +231,15 @@ class GemmaService extends ChangeNotifier {
           throw HttpException('Unexpected HTTP status: ${res.statusCode}');
         }
 
-        final sink = tempFile.openWrite(mode: existingBytes > 0 && res.statusCode == 206
-            ? FileMode.append
-            : FileMode.write);
+        final sink = tempFile.openWrite(
+          mode: existingBytes > 0 && res.statusCode == 206
+              ? FileMode.append
+              : FileMode.write,
+        );
 
-        int receivedBytes = existingBytes > 0 && res.statusCode == 206 ? existingBytes : 0;
+        int receivedBytes = existingBytes > 0 && res.statusCode == 206
+            ? existingBytes
+            : 0;
 
         try {
           await for (final chunk in res) {
@@ -231,14 +249,17 @@ class GemmaService extends ChangeNotifier {
             if (totalBytes > 0) {
               final progress = receivedBytes / totalBytes;
               // Only notify every ~0.3% to avoid flooding the UI.
-              if ((progress * 1000).floor() != (_downloadProgress * 1000).floor()) {
+              if ((progress * 1000).floor() !=
+                  (_downloadProgress * 1000).floor()) {
                 _downloadProgress = progress.clamp(0.0, 1.0);
                 notifyListeners();
               }
             }
           }
           await sink.flush();
-          debugPrint('📡 Resume downloader: Chunk complete. Total received: ${(receivedBytes / 1e6).toStringAsFixed(1)} MB');
+          debugPrint(
+            '📡 Resume downloader: Chunk complete. Total received: ${(receivedBytes / 1e6).toStringAsFixed(1)} MB',
+          );
         } finally {
           await sink.close();
         }
@@ -246,7 +267,9 @@ class GemmaService extends ChangeNotifier {
         // Verify the file is complete.
         final finalSize = await tempFile.length();
         if (totalBytes > 0 && finalSize < totalBytes) {
-          debugPrint('⚠️ Resume downloader: File incomplete ($finalSize / $totalBytes bytes). Will retry...');
+          debugPrint(
+            '⚠️ Resume downloader: File incomplete ($finalSize / $totalBytes bytes). Will retry...',
+          );
           await Future.delayed(const Duration(seconds: 3));
           continue;
         }
@@ -255,13 +278,19 @@ class GemmaService extends ChangeNotifier {
         notifyListeners();
         return tempFile.path;
       } on SocketException catch (e) {
-        debugPrint('⚠️ Resume downloader: SocketException on attempt $attempt: $e. Retrying in 5s...');
+        debugPrint(
+          '⚠️ Resume downloader: SocketException on attempt $attempt: $e. Retrying in 5s...',
+        );
         await Future.delayed(const Duration(seconds: 5));
       } on HttpException catch (e) {
-        debugPrint('⚠️ Resume downloader: HttpException on attempt $attempt: $e. Retrying in 5s...');
+        debugPrint(
+          '⚠️ Resume downloader: HttpException on attempt $attempt: $e. Retrying in 5s...',
+        );
         await Future.delayed(const Duration(seconds: 5));
       } on IOException catch (e) {
-        debugPrint('⚠️ Resume downloader: IOException on attempt $attempt: $e. Retrying in 5s...');
+        debugPrint(
+          '⚠️ Resume downloader: IOException on attempt $attempt: $e. Retrying in 5s...',
+        );
         await Future.delayed(const Duration(seconds: 5));
       } finally {
         client.close();
@@ -274,38 +303,52 @@ class GemmaService extends ChangeNotifier {
   /// Load the model into memory and create a chat session.
   /// Call during splash screen for background warm-up.
   Future<void> loadModel() async {
-    if (_state == GemmaServiceState.loading ||
-        _state == GemmaServiceState.generating) {
+    if (_state == RangaServiceState.loading ||
+        _state == RangaServiceState.generating) {
       // Reset stuck loading state before retrying
-      debugPrint('⚠️ GemmaService: loadModel() called while state=${_state.name}. Resetting state to allow retry.');
-      _state = GemmaServiceState.uninitialized;
+      debugPrint(
+        '⚠️ GemmaService: loadModel() called while state=${_state.name}. Resetting state to allow retry.',
+      );
+      _state = RangaServiceState.uninitialized;
     }
-    _state = GemmaServiceState.loading;
+    _state = RangaServiceState.loading;
     _error = null;
     notifyListeners();
 
     try {
       // Attempt GPU first with a 120-second timeout so it can never hang forever.
       try {
-        debugPrint('📡 GemmaService: Attempting to load model with PreferredBackend.gpu...');
-        _model = await FlutterGemma.getActiveModel(
-          maxTokens: _maxTokens,
-          preferredBackend: PreferredBackend.gpu,
-        ).timeout(
-          const Duration(seconds: 120),
-          onTimeout: () => throw TimeoutException('GPU model load timed out after 120s'),
+        debugPrint(
+          '📡 GemmaService: Attempting to load model with PreferredBackend.gpu...',
         );
-        debugPrint('✅ GemmaService: Model loaded successfully with GPU backend.');
+        _model =
+            await FlutterGemma.getActiveModel(
+              maxTokens: _maxTokens,
+              preferredBackend: PreferredBackend.gpu,
+            ).timeout(
+              const Duration(seconds: 120),
+              onTimeout: () =>
+                  throw TimeoutException('GPU model load timed out after 120s'),
+            );
+        debugPrint(
+          '✅ GemmaService: Model loaded successfully with GPU backend.',
+        );
       } catch (gpuError) {
-        debugPrint('⚠️ GemmaService: GPU backend failed: $gpuError. Retrying with CPU...');
-        _model = await FlutterGemma.getActiveModel(
-          maxTokens: _maxTokens,
-          preferredBackend: PreferredBackend.cpu,
-        ).timeout(
-          const Duration(seconds: 120),
-          onTimeout: () => throw TimeoutException('CPU model load timed out after 120s'),
+        debugPrint(
+          '⚠️ GemmaService: GPU backend failed: $gpuError. Retrying with CPU...',
         );
-        debugPrint('✅ GemmaService: Model loaded successfully with CPU backend fallback.');
+        _model =
+            await FlutterGemma.getActiveModel(
+              maxTokens: _maxTokens,
+              preferredBackend: PreferredBackend.cpu,
+            ).timeout(
+              const Duration(seconds: 120),
+              onTimeout: () =>
+                  throw TimeoutException('CPU model load timed out after 120s'),
+            );
+        debugPrint(
+          '✅ GemmaService: Model loaded successfully with CPU backend fallback.',
+        );
       }
 
       _chat = await _model!.createChat(
@@ -316,10 +359,10 @@ class GemmaService extends ChangeNotifier {
         modelType: ModelType.gemmaIt,
       );
 
-      _state = GemmaServiceState.ready;
+      _state = RangaServiceState.ready;
       notifyListeners();
     } catch (e) {
-      _state = GemmaServiceState.error;
+      _state = RangaServiceState.error;
       _error = 'Model loading failed: $e';
       notifyListeners();
       rethrow;
@@ -333,12 +376,12 @@ class GemmaService extends ChangeNotifier {
       throw StateError('Model not loaded. Call loadModel() first.');
     }
     await _chat!.clearHistory();
-    
+
     final messages = await DatabaseHelper.instance.getMessages(conversationId);
     for (final msg in messages) {
       final isUser = msg['sender_type'] == 'user';
       final text = msg['content_text'] as String;
-      
+
       // Feed the messages directly into native chat history
       await _chat!.addQuery(Message.text(text: text, isUser: isUser));
     }
@@ -350,15 +393,19 @@ class GemmaService extends ChangeNotifier {
   /// - Automatic System Prompt framing with student profile context
   /// - Real-time keyword local tools interception (Clinic hours, Insurance network)
   /// - Enforces [_maxGenerationTokens] limit to prevent thermal throttling.
-  Stream<String> sendMessage(String text, {int? activeConversationId, List<Uint8List>? imageBytes}) async* {
+  Stream<String> sendMessage(
+    String text, {
+    int? activeConversationId,
+    List<Uint8List>? imageBytes,
+  }) async* {
     if (_chat == null) {
       throw StateError('Model not loaded. Call loadModel() first.');
     }
-    if (_state == GemmaServiceState.generating) {
+    if (_state == RangaServiceState.generating) {
       throw StateError('Already generating. Stop current generation first.');
     }
 
-    _state = GemmaServiceState.generating;
+    _state = RangaServiceState.generating;
     _tokensGenerated = 0;
     _lastGenerationTruncated = false;
     _error = null;
@@ -389,42 +436,54 @@ class GemmaService extends ChangeNotifier {
         return;
       }
 
-
       // ─── 5. GENERAL ON-DEVICE INFERENCE (hospital-guidance framing) ─────
       // Clear cost summary for non-hospital queries
       _lastCostSummary = null;
       bool isFirstMessage = true;
       if (activeConversationId != null) {
-        final messages = await DatabaseHelper.instance.getMessages(activeConversationId);
+        final messages = await DatabaseHelper.instance.getMessages(
+          activeConversationId,
+        );
         isFirstMessage = messages.length <= 1;
       }
 
       String prompt = text;
       if (isFirstMessage) {
-        final profileSummary = await DatabaseHelper.instance.generateStudentProfileSummary();
-        final insurance = await DatabaseHelper.instance.getProfileValue('insurance', defaultValue: 'None');
+        final profileSummary = await DatabaseHelper.instance
+            .generateStudentProfileSummary();
+        final insurance = await DatabaseHelper.instance.getProfileValue(
+          'insurance',
+          defaultValue: 'None',
+        );
         final cleanIns = insurance.toLowerCase();
         String insuranceRules = '';
         String insuranceRuleShort = '';
 
         if (cleanIns.contains('britam')) {
-          insuranceRules = '- Britam: Outpatient services (Consultations, Lab, Dental, Ultrasound, X-Ray) are EXCLUDED (100% patient copay applies). Inpatient services (Inpatient Admission, Standard Maternity Delivery) have 0% copay (fully covered).';
-          insuranceRuleShort = '* Britam: out-of-pocket for consultations/lab/dental/scans; free (0 RWF) for inpatient/maternity admission.';
+          insuranceRules =
+              '- Britam: Outpatient services (Consultations, Lab, Dental, Ultrasound, X-Ray) are EXCLUDED (100% patient copay applies). Inpatient services (Inpatient Admission, Standard Maternity Delivery) have 0% copay (fully covered).';
+          insuranceRuleShort =
+              '* Britam: out-of-pocket for consultations/lab/dental/scans; free (0 RWF) for inpatient/maternity admission.';
         } else if (cleanIns.contains('uap') || cleanIns.contains('mutual')) {
-          insuranceRules = '- Old Mutual (UAP): 10% co-payment (90% covered) for all inpatient and outpatient services.';
+          insuranceRules =
+              '- Old Mutual (UAP): 10% co-payment (90% covered) for all inpatient and outpatient services.';
           insuranceRuleShort = '* Old Mutual: 10% of cash price.';
         } else if (cleanIns.contains('mutuelle') || cleanIns.contains('cbhi')) {
-          insuranceRules = '- Mutuelle de Santé (CBHI): 10% co-payment (90% covered) for all services.';
+          insuranceRules =
+              '- Mutuelle de Santé (CBHI): 10% co-payment (90% covered) for all services.';
           insuranceRuleShort = '* Mutuelle: 10% of cash price.';
         } else if (cleanIns.contains('none')) {
-          insuranceRules = '- None (No Insurance): 100% patient copay (fully out-of-pocket).';
+          insuranceRules =
+              '- None (No Insurance): 100% patient copay (fully out-of-pocket).';
           insuranceRuleShort = '* None: full cash price.';
         } else {
-          insuranceRules = '- Active Insurance Plan ($insurance): Outpatient/Inpatient coverage rules are specified in the Student Background contract summary.';
+          insuranceRules =
+              '- Active Insurance Plan ($insurance): Outpatient/Inpatient coverage rules are specified in the Student Background contract summary.';
           insuranceRuleShort = '* $insurance: refer to the contract summary.';
         }
 
-        prompt = '''[SYSTEM DIRECTION — READ CAREFULLY AND FOLLOW STRICTLY:
+        prompt =
+            '''[SYSTEM DIRECTION — READ CAREFULLY AND FOLLOW STRICTLY:
 
 You are a Student Hospital Navigation & Price Comparison Guide for students near Masoro, Kigali, Rwanda.
 
@@ -501,7 +560,11 @@ Student Question: $text''';
       }
       final Message message;
       if (imageBytes != null && imageBytes.isNotEmpty) {
-        message = Message.withImages(text: prompt, imageBytes: imageBytes, isUser: true);
+        message = Message.withImages(
+          text: prompt,
+          imageBytes: imageBytes,
+          isUser: true,
+        );
       } else {
         message = Message.text(text: prompt, isUser: true);
       }
@@ -522,27 +585,31 @@ Student Question: $text''';
 
           generatedText += response.token;
           if (_detectRepetition(generatedText)) {
-            debugPrint('⚠️ GemmaService: Repetition loop detected! Stopping and reloading model. Generated text: "$generatedText"');
+            debugPrint(
+              '⚠️ GemmaService: Repetition loop detected! Stopping and reloading model. Generated text: "$generatedText"',
+            );
             await _chat!.stopGeneration();
-            
+
             // Re-release memory and set to uninitialized
             _chat?.close();
             _model?.close();
             _chat = null;
             _model = null;
-            _state = GemmaServiceState.uninitialized;
+            _state = RangaServiceState.uninitialized;
             notifyListeners();
-            
+
             // Asynchronously reload the model to avoid blocking this stream's close
             Future.microtask(() async {
               try {
                 await loadModel();
-                debugPrint('✅ GemmaService: Model reloaded successfully after repetition loop.');
+                debugPrint(
+                  '✅ GemmaService: Model reloaded successfully after repetition loop.',
+                );
               } catch (e) {
                 debugPrint('❌ GemmaService: Failed to reload model: $e');
               }
             });
-            
+
             yield '\n\n[Repetition loop detected. AI model is reloading...]';
             break;
           }
@@ -556,16 +623,16 @@ Student Question: $text''';
       rethrow;
     } finally {
       _generationStopwatch.stop();
-      _state = GemmaServiceState.ready;
+      _state = RangaServiceState.ready;
       notifyListeners();
     }
   }
 
   /// Stop any in-progress generation.
   Future<void> stopGeneration() async {
-    if (_chat != null && _state == GemmaServiceState.generating) {
+    if (_chat != null && _state == RangaServiceState.generating) {
       await _chat!.stopGeneration();
-      _state = GemmaServiceState.ready;
+      _state = RangaServiceState.ready;
       notifyListeners();
     }
   }
@@ -606,7 +673,7 @@ Student Question: $text''';
   /// Detects if the generated text contains repetition loops (single words, phrases, or character-level).
   bool _detectRepetition(String text) {
     if (text.isEmpty) return false;
-    
+
     // Character level repetition check (e.g. continuous dots, dashes, spaces, etc.)
     if (text.length >= 20) {
       final lastChars = text.substring(text.length - 20);
@@ -616,11 +683,12 @@ Student Question: $text''';
       }
     }
 
-    final words = text.toLowerCase()
+    final words = text
+        .toLowerCase()
         .split(RegExp(r'\s+'))
         .where((w) => w.isNotEmpty)
         .toList();
-        
+
     if (words.length < 8) return false;
 
     // 1. Check for single word repetition (consecutive same words, e.g., "the the the the the the")
@@ -639,12 +707,15 @@ Student Question: $text''';
     // 2. Check for short sequence repetition (2-8 words repeated 3 times at the end)
     for (int len = 2; len <= 8; len++) {
       if (words.length < len * 3) continue;
-      
+
       bool match = true;
       final chunk1 = words.sublist(words.length - len);
       final chunk2 = words.sublist(words.length - 2 * len, words.length - len);
-      final chunk3 = words.sublist(words.length - 3 * len, words.length - 2 * len);
-      
+      final chunk3 = words.sublist(
+        words.length - 3 * len,
+        words.length - 2 * len,
+      );
+
       for (int i = 0; i < len; i++) {
         if (chunk1[i] != chunk2[i] || chunk2[i] != chunk3[i]) {
           match = false;
@@ -659,11 +730,11 @@ Student Question: $text''';
     // 3. Check for larger sequence repetition (9-24 words repeated twice at the end)
     for (int len = 9; len <= 24; len++) {
       if (words.length < len * 2) continue;
-      
+
       bool match = true;
       final chunk1 = words.sublist(words.length - len);
       final chunk2 = words.sublist(words.length - 2 * len, words.length - len);
-      
+
       for (int i = 0; i < len; i++) {
         if (chunk1[i] != chunk2[i]) {
           match = false;
@@ -686,7 +757,7 @@ Student Question: $text''';
   }
 }
 
-enum GemmaServiceState {
+enum RangaServiceState {
   uninitialized,
   downloading,
   downloaded,

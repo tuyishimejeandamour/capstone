@@ -28,7 +28,7 @@ const _kBorderColor = Color(0xFF1E3525);
 
 /// Main chat interface for interacting with Gemma 4 E2B on-device.
 class ChatScreen extends StatefulWidget {
-  final GemmaService gemmaService;
+  final RangaService gemmaService;
   final PerformanceMonitor performanceMonitor;
 
   const ChatScreen({
@@ -101,12 +101,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     // Validate that the loaded insurance is one of the valid dropdown items
-    const validInsurances = [
-      'None',
-      'Mutuelle',
-      'Britam',
-      'UAP',
-    ];
+    const validInsurances = ['None', 'Mutuelle', 'Britam', 'UAP'];
     final validatedInsurance = validInsurances.contains(insurance)
         ? insurance
         : 'None';
@@ -322,7 +317,10 @@ class _ChatScreenState extends State<ChatScreen> {
           final shouldStick = _isNearBottom();
           setState(() {
             if (aiMessageIndex < _messages.length) {
-              final cleanText = rawStreamingText.replaceAll(RegExp(r'\[SHOW_HOSPITALS:?[^\]]*\]?'), '');
+              final cleanText = rawStreamingText.replaceAll(
+                RegExp(r'\[SHOW_HOSPITALS:?[^\]]*\]?'),
+                '',
+              );
               _messages[aiMessageIndex] = _ChatMessage(
                 text: cleanText,
                 isUser: false,
@@ -346,7 +344,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
           if (match != null) {
             final condition = match.group(1)!.trim();
-            final insurance = await DatabaseHelper.instance.getProfileValue('insurance', defaultValue: 'None');
+            final insurance = await DatabaseHelper.instance.getProfileValue(
+              'insurance',
+              defaultValue: 'None',
+            );
             final hospitals = CuratedHospitals.forCondition(condition);
             costSummary = CuratedHospitals.buildCostSummary(
               hospitals,
@@ -694,12 +695,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
 
-            Divider(
-              color: _kBorderColor,
-              height: 1,
-              indent: 20,
-              endIndent: 20,
-            ),
+            Divider(color: _kBorderColor, height: 1, indent: 20, endIndent: 20),
             const SizedBox(height: 6),
 
             // Conversations list
@@ -731,8 +727,9 @@ class _ChatScreenState extends State<ChatScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: ListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                            ),
                             dense: true,
                             horizontalTitleGap: 8,
                             onTap: () {
@@ -742,8 +739,9 @@ class _ChatScreenState extends State<ChatScreen> {
                             leading: Icon(
                               Icons.chat_bubble_outline_rounded,
                               size: 16,
-                              color:
-                                  isSelected ? _kAccentColor : Colors.white38,
+                              color: isSelected
+                                  ? _kAccentColor
+                                  : Colors.white38,
                             ),
                             title: Text(
                               conv['title'] as String,
@@ -782,9 +780,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Navigator.pop(context); // close drawer first
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => const SettingsScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
                   ).then((_) => _initAppSession()); // reload profile on return
                 },
                 child: Container(
@@ -844,7 +840,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-
 // ---------------------------------------------------------------------------
 // Personalized Empty State Dashboard (Replicating Screen 2 mockup)
 // ---------------------------------------------------------------------------
@@ -861,7 +856,6 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
       child: Column(
@@ -915,14 +909,18 @@ class _EmptyState extends StatelessWidget {
               _buildDashboardCard(
                 icon: Icons.spa_outlined,
                 title: 'Wellness & Support',
-                subtitle: 'ALU Wellness office, local clinics, and emergency contacts.',
+                subtitle:
+                    'ALU Wellness office, local clinics, and emergency contacts.',
                 color: _kAccentColor,
-                onTap: () => onCardTap('What wellness and emergency resources are available for ALU students?'),
+                onTap: () => onCardTap(
+                  'What wellness and emergency resources are available for ALU students?',
+                ),
               ).animate().scale(delay: 350.ms, curve: Curves.easeOutBack),
               _buildDashboardCard(
                 icon: Icons.health_and_safety_outlined,
                 title: 'In-Network Hospitals',
-                subtitle: 'Find closest facilities accepting student insurance.',
+                subtitle:
+                    'Find closest facilities accepting student insurance.',
                 color: const Color(0xFF56A6C8),
                 onTap: onFindHospitals,
               ).animate().scale(delay: 450.ms, curve: Curves.easeOutBack),
@@ -931,15 +929,19 @@ class _EmptyState extends StatelessWidget {
                 title: 'Nearest Pharmacy',
                 subtitle: 'Locate local pharmacy shops around Masoro.',
                 color: const Color(0xFFFFB380),
-                onTap: () => onCardTap('Where is the nearest pharmacy to ALU Masoro campus?'),
+                onTap: () => onCardTap(
+                  'Where is the nearest pharmacy to ALU Masoro campus?',
+                ),
               ).animate().scale(delay: 550.ms, curve: Curves.easeOutBack),
               _buildDashboardCard(
                 icon: Icons.shield_outlined,
                 title: 'Student Insurance',
-                subtitle: 'Explain student Britam vs UAP Old Mutual copay policy details.',
+                subtitle:
+                    'Explain student Britam vs UAP Old Mutual copay policy details.',
                 color: const Color(0xFF80FFC4),
-                onTap: () =>
-                    onCardTap('Explain student insurance copay policies for Britam and Old Mutual.'),
+                onTap: () => onCardTap(
+                  'Explain student insurance copay policies for Britam and Old Mutual.',
+                ),
               ).animate().scale(delay: 650.ms, curve: Curves.easeOutBack),
             ],
           ),

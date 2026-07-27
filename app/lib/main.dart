@@ -14,19 +14,23 @@ void main() async {
     await Firebase.initializeApp();
     debugPrint("Firebase initialized successfully.");
   } catch (e) {
-    debugPrint("Firebase initialization failed (expected if config is missing): $e");
+    debugPrint(
+      "Firebase initialization failed (expected if config is missing): $e",
+    );
   }
 
   // Framework init is deferred to SetupScreen so any failure surfaces through
   // the normal retry UI rather than crashing to a black screen pre-runApp.
-  runApp(OnDeviceAIApp(
-    gemmaService: GemmaService(),
-    performanceMonitor: PerformanceMonitor(),
-  ));
+  runApp(
+    OnDeviceAIApp(
+      gemmaService: RangaService(),
+      performanceMonitor: PerformanceMonitor(),
+    ),
+  );
 }
 
 class OnDeviceAIApp extends StatelessWidget {
-  final GemmaService gemmaService;
+  final RangaService gemmaService;
   final PerformanceMonitor performanceMonitor;
 
   const OnDeviceAIApp({
@@ -56,7 +60,7 @@ class OnDeviceAIApp extends StatelessWidget {
 /// On first launch: shows SetupScreen (downloads 2.58 GB model, loads to GPU).
 /// On subsequent launches: loads model from local storage, then shows chat.
 class AppShell extends StatefulWidget {
-  final GemmaService gemmaService;
+  final RangaService gemmaService;
   final PerformanceMonitor performanceMonitor;
 
   const AppShell({

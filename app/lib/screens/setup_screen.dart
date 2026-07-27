@@ -27,7 +27,7 @@ const _kTextMuted = Color(0x80FFFFFF);
 /// Reworked multi-stage Onboarding screen for registration, model download,
 /// and GPU/CPU warm-up. Replicates Screen 1 of the reference mockup.
 class SetupScreen extends StatefulWidget {
-  final GemmaService gemmaService;
+  final RangaService gemmaService;
   final VoidCallback onSetupComplete;
 
   const SetupScreen({
@@ -80,8 +80,11 @@ class _SetupScreenState extends State<SetupScreen> {
   /// If yes, skip Welcome & Registration stages and jump straight to the Engine warm-up.
   Future<void> _checkExistingOnboarding() async {
     final db = DatabaseHelper.instance;
-    final complete = await db.getProfileValue('onboarding_complete', defaultValue: 'false');
-    
+    final complete = await db.getProfileValue(
+      'onboarding_complete',
+      defaultValue: 'false',
+    );
+
     if (complete == 'true') {
       setState(() {
         _currentStage = 2; // Jump straight to Model Loading
@@ -107,7 +110,10 @@ class _SetupScreenState extends State<SetupScreen> {
 
       if (!installed) {
         if (!mounted) return;
-        setState(() => _statusMessage = 'Downloading Gemma 4 E2B...\nThis is a one-time, 2.59 GB download.');
+        setState(
+          () => _statusMessage =
+              'Downloading Gemma 4 E2B...\nThis is a one-time, 2.59 GB download.',
+        );
         await widget.gemmaService.downloadModel();
       }
 
@@ -137,13 +143,14 @@ class _SetupScreenState extends State<SetupScreen> {
       setState(() => _isWorking = false);
       await Future.delayed(const Duration(milliseconds: 600));
       widget.onSetupComplete();
-
     } catch (e) {
       // Catches Dart exceptions, TimeoutException, StateError, AND PlatformException
       if (!mounted) return;
       final msg = e.toString();
       // Provide a friendlier message for the known LiteRT model corruption error
-      final friendlyMsg = msg.contains('TF_LITE_PREFILL_DECODE') || msg.contains('Failed to create engine')
+      final friendlyMsg =
+          msg.contains('TF_LITE_PREFILL_DECODE') ||
+              msg.contains('Failed to create engine')
           ? 'Model file is corrupted or incomplete.\nTap “Delete Corrupted File\u201d below to remove it and re-download.'
           : 'Engine setup failed:\n$msg';
       setState(() {
@@ -158,7 +165,8 @@ class _SetupScreenState extends State<SetupScreen> {
         setState(() {
           _isWorking = false;
           _hasError = true;
-          if (!_statusMessage.contains('failed') && !_statusMessage.contains('corrupted')) {
+          if (!_statusMessage.contains('failed') &&
+              !_statusMessage.contains('corrupted')) {
             _statusMessage = 'Setup did not complete. Please retry.';
           }
         });
@@ -184,7 +192,9 @@ class _SetupScreenState extends State<SetupScreen> {
         await modelFile.delete();
         debugPrint('🗑️ Deleted corrupted model file: ${modelFile.path}');
       } else {
-        debugPrint('ℹ️ No model file found at ${modelFile.path} — skipping delete.');
+        debugPrint(
+          'ℹ️ No model file found at ${modelFile.path} — skipping delete.',
+        );
       }
     } catch (e) {
       debugPrint('⚠️ Failed to delete model file: $e');
@@ -229,7 +239,7 @@ class _SetupScreenState extends State<SetupScreen> {
 
       // Construct prompt for Gemma 4 E2B analysis
       final insurance = _selectedInsurance;
-      final prompt = isPdf 
+      final prompt = isPdf
           ? '''You are a Student Health Guide. The user has uploaded their insurance contract for $insurance. Here is the text content extracted from their PDF document:
 $textContent
 
@@ -238,25 +248,31 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
 
       // We call sendMessage and listen to the stream to build the summary.
       String summary = '';
-      await for (final token in widget.gemmaService.sendMessage(prompt, imageBytes: imageBytes)) {
+      await for (final token in widget.gemmaService.sendMessage(
+        prompt,
+        imageBytes: imageBytes,
+      )) {
         summary += token;
       }
 
       if (summary.trim().isEmpty) {
-        summary = 'Unable to extract detailed information from the contract. Provider is set to $insurance.';
+        summary =
+            'Unable to extract detailed information from the contract. Provider is set to $insurance.';
       }
 
       // Save summary in profile
       final db = DatabaseHelper.instance;
       await db.setProfileValue('insurance_contract_summary', summary.trim());
-      
+
       // Clear native chat history
       await widget.gemmaService.clearChat();
-
     } catch (e) {
       debugPrint('⚠️ Contract analysis failed: $e');
       final db = DatabaseHelper.instance;
-      await db.setProfileValue('insurance_contract_summary', 'Uploaded contract file processing failed: $e. Provider is $_selectedInsurance.');
+      await db.setProfileValue(
+        'insurance_contract_summary',
+        'Uploaded contract file processing failed: $e. Provider is $_selectedInsurance.',
+      );
     }
   }
 
@@ -304,7 +320,9 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
 
   Widget _buildContractPickerSection() {
     final hasFile = _contractFilePath != null;
-    final fileSizeKb = _contractFileSize != null ? (_contractFileSize! / 1024).toStringAsFixed(1) : '0';
+    final fileSizeKb = _contractFileSize != null
+        ? (_contractFileSize! / 1024).toStringAsFixed(1)
+        : '0';
     final isPdf = _contractFileName?.toLowerCase().endsWith('.pdf') ?? false;
 
     return Container(
@@ -342,7 +360,9 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _isContractUploading ? 'Opening Picker...' : 'Tap to Upload Picture or PDF',
+                      _isContractUploading
+                          ? 'Opening Picker...'
+                          : 'Tap to Upload Picture or PDF',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 12,
@@ -352,10 +372,7 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
                     const SizedBox(height: 4),
                     const Text(
                       'Supports PDF, PNG, JPG',
-                      style: TextStyle(
-                        color: _kTextMuted,
-                        fontSize: 10,
-                      ),
+                      style: TextStyle(color: _kTextMuted, fontSize: 10),
                     ),
                   ],
                 ),
@@ -403,7 +420,11 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
                 ),
                 IconButton(
                   onPressed: _removeContractFile,
-                  icon: const Icon(Icons.delete_outline_rounded, color: _kErrorColor, size: 20),
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: _kErrorColor,
+                    size: 20,
+                  ),
                   tooltip: 'Remove contract',
                 ),
               ],
@@ -414,16 +435,27 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
               decoration: BoxDecoration(
                 color: _kAccentColor.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _kAccentColor.withValues(alpha: 0.15), width: 0.5),
+                border: Border.all(
+                  color: _kAccentColor.withValues(alpha: 0.15),
+                  width: 0.5,
+                ),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.auto_awesome_rounded, color: _kAccentColor, size: 14),
+                  Icon(
+                    Icons.auto_awesome_rounded,
+                    color: _kAccentColor,
+                    size: 14,
+                  ),
                   SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       'Will be summarized offline by Gemma 4 E2B during warm-up.',
-                      style: TextStyle(color: _kAccentColor, fontSize: 10, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: _kAccentColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -536,7 +568,10 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
             decoration: BoxDecoration(
               color: _kVioletColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _kVioletColor.withValues(alpha: 0.3), width: 0.8),
+              border: Border.all(
+                color: _kVioletColor.withValues(alpha: 0.3),
+                width: 0.8,
+              ),
             ),
             child: const Text(
               '100% Free & Fully Offline Wellness Guide',
@@ -556,7 +591,10 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
             children: [
               Container(
                 margin: const EdgeInsets.only(bottom: 24),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF1E2837),
                   borderRadius: BorderRadius.circular(20),
@@ -625,7 +663,11 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
                 color: _kSurfaceColor,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+              child: const Icon(
+                Icons.arrow_back_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
           ),
           const SizedBox(height: 28),
@@ -641,11 +683,7 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
           const SizedBox(height: 8),
           const Text(
             'Enter details to tailor on-device wellness advice and hospital recommendations.',
-            style: TextStyle(
-              color: _kTextMuted,
-              fontSize: 14,
-              height: 1.4,
-            ),
+            style: TextStyle(color: _kTextMuted, fontSize: 14, height: 1.4),
           ).animate().fade(delay: 100.ms),
           const SizedBox(height: 32),
 
@@ -659,132 +697,179 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
                 decoration: BoxDecoration(
                   color: _kSurfaceColor.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1.5),
-                ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. Name input
-                const Text(
-                  'YOUR FIRST NAME',
-                  style: TextStyle(
-                    color: _kAccentColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    width: 1.5,
                   ),
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _nameController,
-                  textCapitalization: TextCapitalization.words,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                  decoration: InputDecoration(
-                    hintText: 'e.g. Jackson',
-                    fillColor: _kElevatedColor,
-                    filled: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: _kAccentColor, width: 1.5),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 1. Name input
+                    const Text(
+                      'YOUR FIRST NAME',
+                      style: TextStyle(
+                        color: _kAccentColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                      ),
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFF222F3E), width: 1),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _nameController,
+                      textCapitalization: TextCapitalization.words,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Jackson',
+                        fillColor: _kElevatedColor,
+                        filled: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: _kAccentColor,
+                            width: 1.5,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF222F3E),
+                            width: 1,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-                // 2. Insurance Dropdown
-                const Text(
-                  'INSURANCE PLAN (FOR LOCAL TOOL LOOKUPS)',
-                  style: TextStyle(
-                    color: _kAccentColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: _kElevatedColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF222F3E), width: 1),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedInsurance,
-                      dropdownColor: _kElevatedColor,
-                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: _kAccentColor),
-                      isExpanded: true,
-                      onChanged: (newValue) {
-                        if (newValue != null) {
-                          setState(() {
-                            _selectedInsurance = newValue;
-                          });
-                        }
-                      },
-                      items: const [
-                        DropdownMenuItem(value: 'None', child: Text('No Insurance / Out-of-pocket')),
-                        DropdownMenuItem(value: 'Britam', child: Text('Britam Insurance')),
-                        DropdownMenuItem(value: 'UAP', child: Text('Old Mutual / UAP')),
-                      ],
+                    // 2. Insurance Dropdown
+                    const Text(
+                      'INSURANCE PLAN (FOR LOCAL TOOL LOOKUPS)',
+                      style: TextStyle(
+                        color: _kAccentColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 24),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: _kElevatedColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFF222F3E),
+                          width: 1,
+                        ),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedInsurance,
+                          dropdownColor: _kElevatedColor,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: _kAccentColor,
+                          ),
+                          isExpanded: true,
+                          onChanged: (newValue) {
+                            if (newValue != null) {
+                              setState(() {
+                                _selectedInsurance = newValue;
+                              });
+                            }
+                          },
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'None',
+                              child: Text('No Insurance / Out-of-pocket'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'Britam',
+                              child: Text('Britam Insurance'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'UAP',
+                              child: Text('Old Mutual / UAP'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
 
-                // 2.5. Upload Insurance Contract
-                const Text(
-                  'UPLOAD INSURANCE CONTRACT (IMAGE OR PDF)',
-                  style: TextStyle(
-                    color: _kAccentColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _buildContractPickerSection(),
-                const SizedBox(height: 24),
+                    // 2.5. Upload Insurance Contract
+                    const Text(
+                      'UPLOAD INSURANCE CONTRACT (IMAGE OR PDF)',
+                      style: TextStyle(
+                        color: _kAccentColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildContractPickerSection(),
+                    const SizedBox(height: 24),
 
-                // 3. Wellness Goals Notes
-                const Text(
-                  'WELLNESS FOCUS OR ISSUES (OPTIONAL)',
-                  style: TextStyle(
-                    color: _kAccentColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _goalsController,
-                  maxLines: 3,
-                  style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
-                  decoration: InputDecoration(
-                    hintText: 'e.g. struggles with sleep during exam weeks, stress management...',
-                    fillColor: _kElevatedColor,
-                    filled: true,
-                    contentPadding: const EdgeInsets.all(14),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: _kAccentColor, width: 1.5),
+                    // 3. Wellness Goals Notes
+                    const Text(
+                      'WELLNESS FOCUS OR ISSUES (OPTIONAL)',
+                      style: TextStyle(
+                        color: _kAccentColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                      ),
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFF222F3E), width: 1),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _goalsController,
+                      maxLines: 3,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                      decoration: InputDecoration(
+                        hintText:
+                            'e.g. struggles with sleep during exam weeks, stress management...',
+                        fillColor: _kElevatedColor,
+                        filled: true,
+                        contentPadding: const EdgeInsets.all(14),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: _kAccentColor,
+                            width: 1.5,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF222F3E),
+                            width: 1,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ))).animate().scale(delay: 200.ms, curve: Curves.easeOutBack),
+          ).animate().scale(delay: 200.ms, curve: Curves.easeOutBack),
           const SizedBox(height: 36),
 
           // Submit Button
@@ -847,11 +932,7 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
           const Text(
             'Syncing model files locally for 100% private health queries.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: _kTextMuted,
-              fontSize: 13,
-              height: 1.4,
-            ),
+            style: TextStyle(color: _kTextMuted, fontSize: 13, height: 1.4),
           ).animate().fade(delay: 100.ms),
           const Spacer(flex: 2),
 
@@ -859,7 +940,8 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
           ListenableBuilder(
             listenable: widget.gemmaService,
             builder: (context, _) {
-              final isDownloading = widget.gemmaService.state == GemmaServiceState.downloading;
+              final isDownloading =
+                  widget.gemmaService.state == RangaServiceState.downloading;
               final progress = widget.gemmaService.downloadProgress;
 
               return Stack(
@@ -874,7 +956,9 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
                       child: CircularProgressIndicator(
                         value: progress,
                         strokeWidth: 4,
-                        valueColor: const AlwaysStoppedAnimation<Color>(_kAccentColor),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          _kAccentColor,
+                        ),
                         backgroundColor: Colors.white10,
                       ),
                     ),
@@ -888,7 +972,8 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
           ListenableBuilder(
             listenable: widget.gemmaService,
             builder: (context, _) {
-              final isDownloading = widget.gemmaService.state == GemmaServiceState.downloading;
+              final isDownloading =
+                  widget.gemmaService.state == RangaServiceState.downloading;
               final progress = widget.gemmaService.downloadProgress;
               final percent = '${(progress * 100).toStringAsFixed(1)}%';
 
@@ -911,7 +996,9 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
                       height: 24,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
-                        valueColor: AlwaysStoppedAnimation<Color>(_kAccentColor),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          _kAccentColor,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -953,7 +1040,11 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.delete_sweep_rounded, size: 18, color: Colors.white),
+                    Icon(
+                      Icons.delete_sweep_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
                     SizedBox(width: 8),
                     Text(
                       'DELETE CORRUPTED FILE & RE-DOWNLOAD',
@@ -979,7 +1070,10 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(25),
-                    side: BorderSide(color: Colors.white.withValues(alpha: 0.15), width: 1),
+                    side: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      width: 1,
+                    ),
                   ),
                 ),
                 child: const Text(
@@ -1022,8 +1116,16 @@ class _BubbleTrianglePainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
     // Draw left & right border of bubble triangle tip
-    canvas.drawLine(const Offset(0, 0), Offset(size.width * 0.5, size.height), borderPaint);
-    canvas.drawLine(Offset(size.width, 0), Offset(size.width * 0.5, size.height), borderPaint);
+    canvas.drawLine(
+      const Offset(0, 0),
+      Offset(size.width * 0.5, size.height),
+      borderPaint,
+    );
+    canvas.drawLine(
+      Offset(size.width, 0),
+      Offset(size.width * 0.5, size.height),
+      borderPaint,
+    );
   }
 
   @override
@@ -1075,12 +1177,13 @@ class _SlideToStartButtonState extends State<_SlideToStartButton> {
                   ),
                 ),
               ),
-              
+
               // Slide Knob
               Transform.translate(
                 offset: Offset(_dragOffset, 0),
                 child: GestureDetector(
-                  onHorizontalDragStart: (_) => setState(() => _isDragging = true),
+                  onHorizontalDragStart: (_) =>
+                      setState(() => _isDragging = true),
                   onHorizontalDragUpdate: (details) {
                     setState(() {
                       _dragOffset += details.primaryDelta!;
@@ -1092,14 +1195,19 @@ class _SlideToStartButtonState extends State<_SlideToStartButton> {
                     if (_dragOffset >= maxDragDistance * 0.85) {
                       // Slide complete! Snap to end & trigger callback
                       setState(() => _dragOffset = maxDragDistance);
-                      Future.delayed(const Duration(milliseconds: 100), widget.onSlideComplete);
+                      Future.delayed(
+                        const Duration(milliseconds: 100),
+                        widget.onSlideComplete,
+                      );
                     } else {
                       // Return to start
                       setState(() => _dragOffset = 0.0);
                     }
                   },
                   child: AnimatedContainer(
-                    duration: _isDragging ? Duration.zero : const Duration(milliseconds: 200),
+                    duration: _isDragging
+                        ? Duration.zero
+                        : const Duration(milliseconds: 200),
                     curve: Curves.easeOutCubic,
                     width: knobSize,
                     height: knobSize,
