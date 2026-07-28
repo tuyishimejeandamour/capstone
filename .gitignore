@@ -6,3 +6,7 @@ training/.pytest_cache/
 release/
 dump/
 dataset/ranga_output/ranga_generator_jobs.jsonl
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore
