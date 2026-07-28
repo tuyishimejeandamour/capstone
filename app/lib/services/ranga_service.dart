@@ -87,12 +87,12 @@ class RangaService extends ChangeNotifier {
       final fileSize = await modelFile.length();
       if (fileSize < minimumValidSizeBytes) {
         debugPrint(
-          '⚠️ GemmaService: Model file too small (${(fileSize / 1e9).toStringAsFixed(2)} GB < 2.3 GB minimum). Treating as incomplete.',
+          'GemmaService: Model file too small (${(fileSize / 1e9).toStringAsFixed(2)} GB < 2.3 GB minimum). Treating as incomplete.',
         );
         return false;
       }
       debugPrint(
-        '📡 GemmaService: Model file found on disk (${(fileSize / 1e9).toStringAsFixed(2)} GB). Registering as active...',
+        'GemmaService: Model file found on disk (${(fileSize / 1e9).toStringAsFixed(2)} GB). Registering as active...',
       );
       try {
         await FlutterGemma.installModel(
@@ -102,7 +102,7 @@ class RangaService extends ChangeNotifier {
         return true;
       } catch (e) {
         debugPrint(
-          '⚠️ GemmaService: Failed to register existing model file: $e',
+          'GemmaService: Failed to register existing model file: $e',
         );
         return false;
       }
@@ -118,7 +118,7 @@ class RangaService extends ChangeNotifier {
   Future<void> downloadModel() async {
     if (_downloadFuture != null) {
       debugPrint(
-        '📡 GemmaService: Download is already running. Waiting for completion...',
+        'GemmaService: Download is already running. Waiting for completion...',
       );
       await _downloadFuture;
       return;
@@ -139,7 +139,7 @@ class RangaService extends ChangeNotifier {
     try {
       final absolutePath = await _downloadWithResume();
 
-      debugPrint('📡 GemmaService: Installing model from: $absolutePath');
+      debugPrint('GemmaService: Installing model from: $absolutePath');
       await FlutterGemma.installModel(
         modelType: ModelType.gemmaIt,
         fileType: ModelFileType.litertlm,
@@ -186,7 +186,7 @@ class RangaService extends ChangeNotifier {
         final res = await req.close();
         totalBytes = res.contentLength;
         debugPrint(
-          '📡 Resume downloader: Total size = ${(totalBytes / 1e9).toStringAsFixed(2)} GB',
+          'Resume downloader: Total size = ${(totalBytes / 1e9).toStringAsFixed(2)} GB',
         );
       } finally {
         client.close();
@@ -200,13 +200,13 @@ class RangaService extends ChangeNotifier {
 
       if (totalBytes > 0 && existingBytes >= totalBytes) {
         debugPrint(
-          '📡 Resume downloader: File already fully downloaded ($existingBytes bytes).',
+          'Resume downloader: File already fully downloaded ($existingBytes bytes).',
         );
         return tempFile.path;
       }
 
       debugPrint(
-        '📡 Resume downloader: Attempt $attempt/$maxAttempts — resuming from ${(existingBytes / 1e6).toStringAsFixed(1)} MB',
+        'Resume downloader: Attempt $attempt/$maxAttempts — resuming from ${(existingBytes / 1e6).toStringAsFixed(1)} MB',
       );
 
       final client = HttpClient()
@@ -219,12 +219,12 @@ class RangaService extends ChangeNotifier {
         if (existingBytes > 0) {
           req.headers.set(HttpHeaders.rangeHeader, 'bytes=$existingBytes-');
           debugPrint(
-            '📡 Resume downloader: Sending Range: bytes=$existingBytes-',
+            'Resume downloader: Sending Range: bytes=$existingBytes-',
           );
         }
 
         final res = await req.close();
-        debugPrint('📡 Resume downloader: HTTP ${res.statusCode}');
+        debugPrint('Resume downloader: HTTP ${res.statusCode}');
 
         // 200 = full content (new download), 206 = partial content (resume)
         if (res.statusCode != 200 && res.statusCode != 206) {
@@ -258,7 +258,7 @@ class RangaService extends ChangeNotifier {
           }
           await sink.flush();
           debugPrint(
-            '📡 Resume downloader: Chunk complete. Total received: ${(receivedBytes / 1e6).toStringAsFixed(1)} MB',
+            'Resume downloader: Chunk complete. Total received: ${(receivedBytes / 1e6).toStringAsFixed(1)} MB',
           );
         } finally {
           await sink.close();
@@ -268,7 +268,7 @@ class RangaService extends ChangeNotifier {
         final finalSize = await tempFile.length();
         if (totalBytes > 0 && finalSize < totalBytes) {
           debugPrint(
-            '⚠️ Resume downloader: File incomplete ($finalSize / $totalBytes bytes). Will retry...',
+            'Resume downloader: File incomplete ($finalSize / $totalBytes bytes). Will retry...',
           );
           await Future.delayed(const Duration(seconds: 3));
           continue;
@@ -279,17 +279,17 @@ class RangaService extends ChangeNotifier {
         return tempFile.path;
       } on SocketException catch (e) {
         debugPrint(
-          '⚠️ Resume downloader: SocketException on attempt $attempt: $e. Retrying in 5s...',
+          'Resume downloader: SocketException on attempt $attempt: $e. Retrying in 5s...',
         );
         await Future.delayed(const Duration(seconds: 5));
       } on HttpException catch (e) {
         debugPrint(
-          '⚠️ Resume downloader: HttpException on attempt $attempt: $e. Retrying in 5s...',
+          'Resume downloader: HttpException on attempt $attempt: $e. Retrying in 5s...',
         );
         await Future.delayed(const Duration(seconds: 5));
       } on IOException catch (e) {
         debugPrint(
-          '⚠️ Resume downloader: IOException on attempt $attempt: $e. Retrying in 5s...',
+          'Resume downloader: IOException on attempt $attempt: $e. Retrying in 5s...',
         );
         await Future.delayed(const Duration(seconds: 5));
       } finally {
@@ -307,7 +307,7 @@ class RangaService extends ChangeNotifier {
         _state == RangaServiceState.generating) {
       // Reset stuck loading state before retrying
       debugPrint(
-        '⚠️ GemmaService: loadModel() called while state=${_state.name}. Resetting state to allow retry.',
+        'GemmaService: loadModel() called while state=${_state.name}. Resetting state to allow retry.',
       );
       _state = RangaServiceState.uninitialized;
     }
@@ -319,7 +319,7 @@ class RangaService extends ChangeNotifier {
       // Attempt GPU first with a 120-second timeout so it can never hang forever.
       try {
         debugPrint(
-          '📡 GemmaService: Attempting to load model with PreferredBackend.gpu...',
+          'GemmaService: Attempting to load model with PreferredBackend.gpu...',
         );
         _model =
             await FlutterGemma.getActiveModel(
@@ -331,11 +331,11 @@ class RangaService extends ChangeNotifier {
                   throw TimeoutException('GPU model load timed out after 120s'),
             );
         debugPrint(
-          '✅ GemmaService: Model loaded successfully with GPU backend.',
+          'GemmaService: Model loaded successfully with GPU backend.',
         );
       } catch (gpuError) {
         debugPrint(
-          '⚠️ GemmaService: GPU backend failed: $gpuError. Retrying with CPU...',
+          'GemmaService: GPU backend failed: $gpuError. Retrying with CPU...',
         );
         _model =
             await FlutterGemma.getActiveModel(
@@ -347,7 +347,7 @@ class RangaService extends ChangeNotifier {
                   throw TimeoutException('CPU model load timed out after 120s'),
             );
         debugPrint(
-          '✅ GemmaService: Model loaded successfully with CPU backend fallback.',
+          'GemmaService: Model loaded successfully with CPU backend fallback.',
         );
       }
 

@@ -190,14 +190,14 @@ class _SetupScreenState extends State<SetupScreen> {
 
       if (await modelFile.exists()) {
         await modelFile.delete();
-        debugPrint('🗑️ Deleted corrupted model file: ${modelFile.path}');
+        debugPrint('Deleted corrupted model file: ${modelFile.path}');
       } else {
         debugPrint(
-          'ℹ️ No model file found at ${modelFile.path} — skipping delete.',
+          'No model file found at ${modelFile.path} — skipping delete.',
         );
       }
     } catch (e) {
-      debugPrint('⚠️ Failed to delete model file: $e');
+      debugPrint('Failed to delete model file: $e');
     }
 
     if (!mounted) return;
@@ -267,7 +267,7 @@ Please analyze this contract. Extract and summarize the key benefits, coverage l
       // Clear native chat history
       await widget.gemmaService.clearChat();
     } catch (e) {
-      debugPrint('⚠️ Contract analysis failed: $e');
+      debugPrint('Contract analysis failed: $e');
       final db = DatabaseHelper.instance;
       await db.setProfileValue(
         'insurance_contract_summary',

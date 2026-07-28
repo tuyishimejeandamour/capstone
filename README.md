@@ -40,7 +40,7 @@ An offline-first, private-by-design mobile application built with Flutter that r
 ## GitHub Repository
 
 Access the source code, open issues, and submit pull requests here:
-👉 **[Ranga GitHub Repository](https://github.com/tuyishimejeandamour/capstone)**
+**[Ranga GitHub Repository](https://github.com/tuyishimejeandamour/capstone)**
 
 ---
 
@@ -192,7 +192,7 @@ To prepare your capstone report, capture the following **five screenshots** of t
 You can download the compiled production APK directly from this repository to install on your Android device:
 
 1. **Direct Download Link**: 
-   👉 **[Download ranga.apk](https://github.com/tuyishimejeandamour/capstone/raw/main/release/ranga.apk)**
+   **[Download ranga.apk](https://github.com/tuyishimejeandamour/capstone/raw/main/release/ranga.apk)**
 2. **Local Path**: 
    If you have cloned this repository, the build output is stored locally at `release/ranga.apk`.
 3. **Installation Steps**:
@@ -316,7 +316,7 @@ flowchart TD
 ## Walkthrough Demo Video
 
 To watch the live prototype demonstration walkthrough of the Ranga Offline Student Health Assistant:
-👉 **[Ranga Demonstration Video](https://www.bugufi.link/-AWwb1)**
+**[Ranga Demonstration Video](https://www.bugufi.link/-AWwb1)**
 
 ---
 

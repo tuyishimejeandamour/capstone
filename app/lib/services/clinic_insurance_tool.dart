@@ -5,20 +5,21 @@ class ClinicInsuranceTool {
         'ALU Masoro Campus, Kigali, Rwanda (Health & Wellness Office, Ground Floor)',
     'alu_support':
         'ALU Wellness Coordinator: Dedicated mental health support and counseling. Walk-in or email studentwellness@alueducation.com.',
-    'wellness_hours':
-        'Monday - Friday: 9:00 AM - 5:00 PM',
+    'wellness_hours': 'Monday - Friday: 9:00 AM - 5:00 PM',
     'nearest_health_centers':
         '- Ndera Health Center (CS Ndera): Local public clinic for primary care | ~1.5 km | +250 788 888 888\n'
         '- Kabuga Health Center: Public clinic | ~5.0 km\n'
         '- Masoro Community Pharmacy: 24/7 nearest pharmacy | Masoro Commercial Center | +250 788 999 999',
-    'crisis_line': 'Rwanda National Emergency Line (24/7): 112 / Suicide Prevention: 114',
+    'crisis_line':
+        'Rwanda National Emergency Line (24/7): 112 / Suicide Prevention: 114',
     'next_steps':
         'Note that ALU does not have an active on-campus clinic. For minor health concerns, visit the ALU Wellness Office or the nearest Ndera Health Center. For emergencies, call 112 or visit Rwanda Military Hospital (RMH) ER.',
   };
 
   static const Map<String, Map<String, String>> insuranceNetworks = {
     'mutuelle': {
-      'hospital': 'Kibagabaga District Hospital (via Local Health Center referral)',
+      'hospital':
+          'Kibagabaga District Hospital (via Local Health Center referral)',
       'distance': 'Gasabo, Kigali',
       'address': 'Kibagabaga Road, Gasabo',
       'notes':
@@ -70,13 +71,13 @@ class ClinicInsuranceTool {
 
   /// Returns ALU Wellness and local Masoro support details as a formatted text block.
   static String getClinicHoursText() {
-    return '🏥 **${wellnessInfo['name']}**\n'
-        '📍 **Office:** ${wellnessInfo['location']}\n'
-        '⏰ **Office Hours:** ${wellnessInfo['wellness_hours']}\n'
-        '🧠 **ALU Wellness & Counseling:** ${wellnessInfo['alu_support']}\n\n'
-        '💊 **Nearest Local Care & Pharmacy:**\n${wellnessInfo['nearest_health_centers']}\n\n'
-        '🚨 **24/7 Emergency Hotlines:** ${wellnessInfo['crisis_line']}\n'
-        '📝 **Important Note & Next Steps:** ${wellnessInfo['next_steps']}';
+    return '**${wellnessInfo['name']}**\n'
+        '**Office:** ${wellnessInfo['location']}\n'
+        '**Office Hours:** ${wellnessInfo['wellness_hours']}\n'
+        '**ALU Wellness & Counseling:** ${wellnessInfo['alu_support']}\n\n'
+        '**Nearest Local Care & Pharmacy:**\n${wellnessInfo['nearest_health_centers']}\n\n'
+        '**24/7 Emergency Hotlines:** ${wellnessInfo['crisis_line']}\n'
+        '**Important Note & Next Steps:** ${wellnessInfo['next_steps']}';
   }
 
   /// Finds and formats hospital recommendations based on the student's insurance plan.
@@ -88,17 +89,22 @@ class ClinicInsuranceTool {
 
     // Look for matching network
     String matchedKey = '';
-    if (cleanInsurance.contains('mutuelle') || cleanInsurance.contains('cbhi')) {
+    if (cleanInsurance.contains('mutuelle') ||
+        cleanInsurance.contains('cbhi')) {
       matchedKey = 'mutuelle';
-    } else if (cleanInsurance.contains('rssb') || cleanInsurance.contains('rama')) {
+    } else if (cleanInsurance.contains('rssb') ||
+        cleanInsurance.contains('rama')) {
       matchedKey = 'rssb';
-    } else if (cleanInsurance.contains('mmi') || cleanInsurance.contains('military')) {
+    } else if (cleanInsurance.contains('mmi') ||
+        cleanInsurance.contains('military')) {
       matchedKey = 'mmi';
-    } else if (cleanInsurance.contains('sanlam') || cleanInsurance.contains('soras')) {
+    } else if (cleanInsurance.contains('sanlam') ||
+        cleanInsurance.contains('soras')) {
       matchedKey = 'sanlam';
     } else if (cleanInsurance.contains('britam')) {
       matchedKey = 'britam';
-    } else if (cleanInsurance.contains('uap') || cleanInsurance.contains('mutual')) {
+    } else if (cleanInsurance.contains('uap') ||
+        cleanInsurance.contains('mutual')) {
       matchedKey = 'uap';
     } else if (cleanInsurance.contains('radiant')) {
       matchedKey = 'radiant';
@@ -106,15 +112,15 @@ class ClinicInsuranceTool {
 
     if (matchedKey.isNotEmpty && insuranceNetworks.containsKey(matchedKey)) {
       final network = insuranceNetworks[matchedKey]!;
-      return '🏥 **Recommended Hospital (In-Network for $insurance):**\n'
-          '🏨 **Hospital:** ${network['hospital']}\n'
-          '📍 **Address:** ${network['address']} (${network['distance']})\n'
-          '📝 **Coverage Notes:** ${network['notes']}';
+      return '**Recommended Hospital (In-Network for $insurance):**\n'
+          '**Hospital:** ${network['hospital']}\n'
+          '**Address:** ${network['address']} (${network['distance']})\n'
+          '**Coverage Notes:** ${network['notes']}';
     }
 
-    return '🏥 **Hospital Recommendation:**\n'
+    return '**Hospital Recommendation:**\n'
         'Because your insurance provider is listed as **"$insurance"** or is not in our direct database, we recommend visiting:\n'
-        '🏨 **CHUK (University Teaching Hospital of Kigali)** (📍 Nyarugenge, Kigali) or **Kibagabaga Hospital** (📍 Gasabo) for consultations.\n'
+        '**CHUK (University Teaching Hospital of Kigali)** (Nyarugenge, Kigali) or **Kibagabaga Hospital** (Gasabo) for consultations.\n'
         'For emergency cases, please visit the nearest district hospital or call **112** (emergency line in Rwanda).';
   }
 }

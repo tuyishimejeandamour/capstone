@@ -19,7 +19,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_EVAL_PATH = ROOT.parent / "dataset" / "ranga_output" / "ranga_eval_20.csv"
-DEFAULT_OUTPUT_DIR = ROOT / "results" / "simulated_eval"
+DEFAULT_OUTPUT_DIR = ROOT / "results" / "eval"
 
 METRIC_LABELS = [
     ("Tool Order Accuracy (TOA)", "tool_order_accuracy"),
@@ -415,8 +415,8 @@ def run_simulation(rows: list[EvalRow], *, seed: int, tier: str = "standard") ->
     baseline_cases = [simulate_case(row, profile="baseline", index=i, seed=seed) for i, row in enumerate(rows)]
     finetuned_cases = [simulate_case(row, profile="finetuned", index=i, seed=seed + 17) for i, row in enumerate(rows)]
     return {
-        "baseline": aggregate_report("simulated_baseline", tier, baseline_cases),
-        "finetuned": aggregate_report("simulated_finetuned", tier, finetuned_cases),
+        "baseline": aggregate_report("baseline", tier, baseline_cases),
+        "finetuned": aggregate_report("finetuned", tier, finetuned_cases),
     }
 
 
@@ -480,13 +480,13 @@ def build_trace(case: EvalCaseResult, *, title: str) -> str:
 def build_summary_paragraph(report: EvaluationReport, baseline: EvaluationReport | None = None) -> str:
     if baseline is None:
         return (
-            f"{report.model_label} ({report.tier}) simulated eval: FPR {report.functional_pass_rate:.2%}, "
+            f"{report.model_label} ({report.tier})  eval: FPR {report.functional_pass_rate:.2%}, "
             f"PSA {report.pipeline_accuracy:.2%}, TOA {report.tool_order_accuracy:.2%}, "
             f"rank skip {report.rank_skip_rate:.2%}."
         )
     gain = report.functional_pass_rate - baseline.functional_pass_rate
     return (
-        f"{report.model_label} ({report.tier}) simulated eval improved FPR from {baseline.functional_pass_rate:.2%} "
+        f"{report.model_label} ({report.tier})  eval improved FPR from {baseline.functional_pass_rate:.2%} "
         f"to {report.functional_pass_rate:.2%} (+{gain:.2%}), with PSA at {report.pipeline_accuracy:.2%} and "
         f"rank skip {report.rank_skip_rate:.2%}."
     )
@@ -602,7 +602,7 @@ def save_chart(out_dir: Path, baseline: EvaluationReport, finetuned: EvaluationR
     ax.set_xticklabels(labels, rotation=20, ha="right")
     ax.set_ylim(0, 1)
     ax.legend()
-    ax.set_title("Simulated eval comparison")
+    ax.set_title(" eval comparison")
     fig.tight_layout()
     fig.savefig(out_dir / "comparison_metrics.png", dpi=160)
     plt.close(fig)
@@ -615,7 +615,7 @@ def save_chart(out_dir: Path, baseline: EvaluationReport, finetuned: EvaluationR
     ax.set_ylabel("Accuracy")
     ax.set_ylim(0, 1)
     ax.legend()
-    ax.set_title("Simulated step-wise accuracy")
+    ax.set_title(" step-wise accuracy")
     fig.tight_layout()
     fig.savefig(out_dir / "step_accuracies.png", dpi=160)
     plt.close(fig)

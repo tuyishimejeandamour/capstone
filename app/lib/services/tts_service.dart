@@ -1,6 +1,32 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
+String sanitizeTextForSpeech(String text) {
+  final cleanText = text
+      .replaceAll('\u{FE0F}', '')
+      .replaceAll('\u{1F3E5}', '')
+      .replaceAll('\u{1F4CD}', '')
+      .replaceAll('\u{23F0}', '')
+      .replaceAll('\u{1F4DE}', '')
+      .replaceAll('\u{1F9E0}', '')
+      .replaceAll('\u{1F6A8}', '')
+      .replaceAll('\u{1F4DD}', '')
+      .replaceAll('\u{1F3E8}', '')
+      .replaceAll('\u{1F48A}', '')
+      .replaceAll('\u{1F5D1}', '')
+      .replaceAll('\u{2139}', '')
+      .replaceAll('\u{26A0}', '')
+      .replaceAll('\u{2705}', '')
+      .replaceAll('\u{1F4E1}', '')
+      .replaceAll('\u{1F527}', '')
+      .replaceAll(RegExp(r'\*+'), '')
+      .replaceAll(RegExp(r'#+'), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+
+  return cleanText;
+}
+
 class TtsService extends ChangeNotifier {
   final FlutterTts _flutterTts = FlutterTts();
   bool _isPlaying = false;
@@ -26,20 +52,28 @@ class TtsService extends ChangeNotifier {
           final locale = v['locale']?.toString() ?? '';
           return locale.startsWith('en-US') || locale == 'en_US';
         }).toList();
-        
+
         Map<dynamic, dynamic>? bestVoice;
         for (var v in enVoices) {
           final name = v['name']?.toString().toLowerCase() ?? '';
-          if (name.contains('siri') || name.contains('enhanced') || name.contains('premium') || name.contains('neural')) {
+          if (name.contains('siri') ||
+              name.contains('enhanced') ||
+              name.contains('premium') ||
+              name.contains('neural')) {
             bestVoice = v as Map<dynamic, dynamic>;
             break;
           }
         }
         // Fallback to first en-US voice if no enhanced one found
-        bestVoice ??= enVoices.isNotEmpty ? enVoices.first as Map<dynamic, dynamic> : null;
-        
+        bestVoice ??= enVoices.isNotEmpty
+            ? enVoices.first as Map<dynamic, dynamic>
+            : null;
+
         if (bestVoice != null) {
-          await _flutterTts.setVoice({"name": bestVoice['name']?.toString() ?? "", "locale": bestVoice['locale']?.toString() ?? ""});
+          await _flutterTts.setVoice({
+            "name": bestVoice['name']?.toString() ?? "",
+            "locale": bestVoice['locale']?.toString() ?? "",
+          });
         }
       }
     } catch (e) {
@@ -84,12 +118,8 @@ class TtsService extends ChangeNotifier {
   /// Narrates a text block aloud if TTS is enabled
   Future<void> speak(String text) async {
     if (!_isEnabled || text.isEmpty) return;
-    
-    // Clean up Markdown before speaking
-    final cleanText = text
-        .replaceAll(RegExp(r'\*+'), '') // Remove bold asterisks
-        .replaceAll(RegExp(r'#+'), '')  // Remove heading hashes
-        .replaceAll(RegExp(r'🏥|📍|⏰|📞|🧠|🚨|📝|🏨'), ''); // Remove emojis
+
+    final cleanText = sanitizeTextForSpeech(text);
 
     await _flutterTts.stop();
     await _flutterTts.speak(cleanText);
