@@ -20,6 +20,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent
 DEFAULT_EVAL_PATH = ROOT.parent / "dataset" / "ranga_output" / "ranga_eval_20.csv"
 DEFAULT_OUTPUT_DIR = ROOT / "results" / "eval"
+PIPELINE_LABELS = ("nearby", "condition")
+PIPELINE_POSITIVE_LABEL = "condition"
 
 METRIC_LABELS = [
     ("Tool Order Accuracy (TOA)", "tool_order_accuracy"),
@@ -95,6 +97,8 @@ class EvaluationReport:
     extra_tool_rate: float
     early_stop_rate: float
     rank_skip_rate: float
+    pipeline_confusion_matrix: dict[str, dict[str, int]] = field(default_factory=dict)
+    pipeline_false_positive_rate: float = 0.0
     step_accuracies: list[float] = field(default_factory=list)
     per_case: list[EvalCaseResult] = field(default_factory=list)
 
@@ -182,6 +186,41 @@ def infer_pipeline(predicted_tools: list[str]) -> str:
 
 def _reached_search(tools: list[str]) -> bool:
     return "getNearbyHospitals" in tools or "searchHospitalsByCondition" in tools
+
+
+def build_pipeline_confusion_matrix(cases: list[EvalCaseResult]) -> dict[str, dict[str, int]]:
+    matrix = {actual: {predicted: 0 for predicted in PIPELINE_LABELS} for actual in PIPELINE_LABELS}
+    for case in cases:
+        actual = case.expected_pipeline
+        predicted = case.predicted_pipeline
+        if actual in matrix and predicted in matrix[actual]:
+            matrix[actual][predicted] += 1
+    return matrix
+
+
+def pipeline_false_positive_rate(matrix: dict[str, dict[str, int]]) -> float:
+    false_positives = matrix["nearby"][PIPELINE_POSITIVE_LABEL]
+    true_negatives = matrix["nearby"]["nearby"]
+    denominator = false_positives + true_negatives
+    return false_positives / denominator if denominator else 0.0
+
+
+def confusion_matrix_rows(matrix: dict[str, dict[str, int]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for actual in PIPELINE_LABELS:
+        for predicted in PIPELINE_LABELS:
+            rows.append({"actual": actual, "predicted": predicted, "count": matrix[actual][predicted]})
+    return rows
+
+
+def format_confusion_matrix_markdown(matrix: dict[str, dict[str, int]]) -> str:
+    headers = ["actual / predicted", *PIPELINE_LABELS]
+    lines = ["| " + " | ".join(headers) + " |", "| " + " | ".join(["---"] * len(headers)) + " |"]
+    for actual in PIPELINE_LABELS:
+        lines.append("| " + " | ".join([actual, *(str(matrix[actual][predicted]) for predicted in PIPELINE_LABELS)]) + " |")
+    lines.append("")
+    lines.append(f"Pipeline false positive rate (condition on nearby): {pipeline_false_positive_rate(matrix):.2%}")
+    return "\n".join(lines)
 
 
 def _functional_pass(case: EvalCaseResult) -> bool:
@@ -385,6 +424,7 @@ def aggregate_report(model_label: str, tier: str, cases: list[EvalCaseResult]) -
     ins = [case.insurance_correct for case in cases if case.insurance_correct is not None]
     search = [case.search_arg_correct for case in cases if case.search_arg_correct is not None]
     arg_scores = [score for score in ins + search if score is not None]
+    matrix = build_pipeline_confusion_matrix(cases)
 
     step_accuracies: list[float] = []
     for step_idx in range(4):
@@ -406,6 +446,8 @@ def aggregate_report(model_label: str, tier: str, cases: list[EvalCaseResult]) -
         extra_tool_rate=sum(any(step.extra_calls > 0 for step in case.steps) for case in cases) / max(n, 1),
         early_stop_rate=sum(case.completion_rate < 1.0 and not case.functional_pass for case in cases) / max(n, 1),
         rank_skip_rate=sum(_reached_search(case.predicted_tools) and "rankHospitalsByPriorityAndCost" not in case.predicted_tools for case in cases) / max(n, 1),
+        pipeline_confusion_matrix=matrix,
+        pipeline_false_positive_rate=pipeline_false_positive_rate(matrix),
         step_accuracies=step_accuracies,
         per_case=cases,
     )
@@ -480,15 +522,15 @@ def build_trace(case: EvalCaseResult, *, title: str) -> str:
 def build_summary_paragraph(report: EvaluationReport, baseline: EvaluationReport | None = None) -> str:
     if baseline is None:
         return (
-            f"{report.model_label} ({report.tier})  eval: FPR {report.functional_pass_rate:.2%}, "
-            f"PSA {report.pipeline_accuracy:.2%}, TOA {report.tool_order_accuracy:.2%}, "
-            f"rank skip {report.rank_skip_rate:.2%}."
+            f"{report.model_label} ({report.tier}) eval: functional pass rate {report.functional_pass_rate:.2%}, "
+            f"pipeline accuracy {report.pipeline_accuracy:.2%}, pipeline false positive rate {report.pipeline_false_positive_rate:.2%}, "
+            f"TOA {report.tool_order_accuracy:.2%}, rank skip {report.rank_skip_rate:.2%}."
         )
     gain = report.functional_pass_rate - baseline.functional_pass_rate
     return (
-        f"{report.model_label} ({report.tier})  eval improved FPR from {baseline.functional_pass_rate:.2%} "
-        f"to {report.functional_pass_rate:.2%} (+{gain:.2%}), with PSA at {report.pipeline_accuracy:.2%} and "
-        f"rank skip {report.rank_skip_rate:.2%}."
+        f"{report.model_label} ({report.tier}) eval improved functional pass rate from {baseline.functional_pass_rate:.2%} "
+        f"to {report.functional_pass_rate:.2%} (+{gain:.2%}), with pipeline accuracy {report.pipeline_accuracy:.2%}, "
+        f"pipeline false positive rate {report.pipeline_false_positive_rate:.2%}, and rank skip {report.rank_skip_rate:.2%}."
     )
 
 
@@ -559,6 +601,16 @@ def save_eval_artifacts(report: EvaluationReport, out_dir: Path, baseline: Evalu
         out_dir / f"{prefix}_by_category.csv",
         category_csv_rows,
         ["category", "cases", "functional_pass_rate", "pipeline_accuracy", "tool_order_accuracy"],
+    )
+
+    write_csv(
+        out_dir / f"{prefix}_confusion_matrix.csv",
+        confusion_matrix_rows(report.pipeline_confusion_matrix),
+        ["actual", "predicted", "count"],
+    )
+    (out_dir / f"{prefix}_confusion_matrix.md").write_text(
+        format_confusion_matrix_markdown(report.pipeline_confusion_matrix),
+        encoding="utf-8",
     )
 
     (out_dir / f"{prefix}_summary.md").write_text(build_summary_paragraph(report, baseline), encoding="utf-8")
